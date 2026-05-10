@@ -1,0 +1,12 @@
+{
+  "name": "iss-sky-plotter",
+  "version": "1.0.0",
+  "description": "Plots ISS visible passes on a sky chart, flagging close approaches to planets",
+  "main": "generate.js",
+  "scripts": {
+    "start": "node generate.js"
+  },
+  "dependencies": {
+    "satellite.js": "^5.0.0"
+  }
+}

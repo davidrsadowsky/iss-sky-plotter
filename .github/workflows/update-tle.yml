@@ -1,0 +1,32 @@
+name: Update ISS TLE Data
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 6:00 AM UTC
+    - cron: '0 18 * * *'  # 6:00 PM UTC
+  workflow_dispatch:       # Allow manual trigger from the GitHub Actions tab
+
+jobs:
+  update-tle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch TLE
+        run: node scripts/fetch-tle.js
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add tle.json
+          git diff --staged --quiet || git commit -m "chore: update ISS TLE [skip ci]"
+          git push
