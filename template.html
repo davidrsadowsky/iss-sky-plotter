@@ -879,14 +879,15 @@ function openTransitMap(passIndex, planetName) {
   const seaLevelLine = L.polyline(latlngs, { color: '#ffc830', weight: 3, opacity: 0.92 }).addTo(leafletMap);
 
   // Legend
+  let legendDiv;
   const legend = L.control({ position: 'bottomright' });
   legend.onAdd = () => {
-    const div = L.DomUtil.create('div', '');
-    div.style.cssText = 'background:rgba(8,8,22,0.93);color:#c0c8f0;padding:8px 12px;border-radius:6px;border:1px solid #203060;font-size:11px;line-height:2;pointer-events:none';
-    div.innerHTML =
+    legendDiv = L.DomUtil.create('div', '');
+    legendDiv.style.cssText = 'background:rgba(8,8,22,0.93);color:#c0c8f0;padding:8px 12px;border-radius:6px;border:1px solid #203060;font-size:11px;line-height:2;pointer-events:none';
+    legendDiv.innerHTML =
       '<div><span style="display:inline-block;width:22px;height:3px;background:#ffc830;margin-right:7px;vertical-align:middle"></span>Sea level</div>' +
       '<div><span style="display:inline-block;width:22px;height:3px;background:#00d4ff;margin-right:7px;vertical-align:middle"></span>Terrain corrected</div>';
-    return div;
+    return legendDiv;
   };
   legend.addTo(leafletMap);
 
@@ -941,6 +942,9 @@ function openTransitMap(passIndex, planetName) {
         L.polyline(correctedLatlngs, { color: '#00d4ff', weight: 3, opacity: 0.95 }).addTo(leafletMap);
         elevStatus.innerHTML =
           `<span style="color:#00d4ff">✓ Terrain correction applied — ${sampled.length} samples via ${source}. Zoom in and click again for finer correction.</span>`;
+        if (legendDiv) legendDiv.innerHTML =
+          '<div><span style="display:inline-block;width:22px;height:3px;background:#ffc830;margin-right:7px;vertical-align:middle"></span>Sea level</div>' +
+          `<div><span style="display:inline-block;width:22px;height:3px;background:#00d4ff;margin-right:7px;vertical-align:middle"></span>Terrain corrected (${source})</div>`;
       } else {
         elevStatus.innerHTML = '<span style="color:#ff8060">Could not compute corrected path for this area.</span>';
       }
@@ -980,7 +984,7 @@ function openTransitMap(passIndex, planetName) {
     `<strong>Nearest transit point:</strong> ${distStr} from your location &nbsp;·&nbsp; ` +
     `<strong>Be there at:</strong> ${fmtTime(closest.time)} local` +
     `<br><span style="color:#40507a;font-size:0.82em">⚠ Accuracy limited by TLE precision (~100–500 m). Refresh ISS data on the day of the event for best results.</span>` +
-    `<br><span style="color:#506080;font-size:0.82em">Click the gold line to apply terrain elevation correction for the area currently in view.</span>`;
+    `<br><span style="color:#506080;font-size:0.82em">For best accuracy, zoom into your target area first, then click the gold line to apply terrain elevation correction. Click again after zooming for finer results.</span>`;
   document.getElementById('map-elev-status').textContent = '';
 }
 
