@@ -47,6 +47,13 @@
       border-radius: 4px; padding: 4px 8px; font-size: 0.9em; cursor: pointer;
     }
     select:focus { outline: 1px solid #4050b0; }
+    #generate-bar { margin-bottom: 16px; }
+    #btn-generate {
+      background: #1a3878; color: #b8ccff; border: 1px solid #3858b0;
+      padding: 8px 28px; font-size: 1em; border-radius: 6px; letter-spacing: 0.3px;
+    }
+    #btn-generate:hover { background: #2248a0; }
+    #btn-generate:disabled { opacity: 0.4; cursor: default; }
     input[type="text"], input[type="number"] {
       background: #0d0d22; color: #c0c8f0; border: 1px solid #2030608;
       border: 1px solid #203060; border-radius: 4px;
@@ -162,6 +169,17 @@
       <option value="km">Kilometers</option>
     </select>
   </span>
+  <span>
+    <label for="sel-show">Show:</label>
+    <select id="sel-show">
+      <option value="all" selected>All passes</option>
+      <option value="planet">Planet/Moon passes only</option>
+    </select>
+  </span>
+</div>
+
+<div id="generate-bar">
+  <button id="btn-generate" onclick="generatePasses()" disabled>Generate Passes</button>
 </div>
 
 <div id="status-bar"></div>
@@ -199,6 +217,7 @@
       <button id="map-close" onclick="closeTransitMap()">✕ Close</button>
     </div>
     <div id="map-info"></div>
+    <div id="map-elev-status" style="font-size:0.82em;margin-bottom:8px;min-height:1.2em"></div>
     <div id="map-container"></div>
   </div>
 </div>
@@ -212,13 +231,14 @@ TLE_DATA_PLACEHOLDER
 'use strict';
 
 // ── CONFIG ──────────────────────────────────────────────────────────────
-const MIN_ELEVATION = 5;          // degrees — minimum ISS altitude to count
 const SUN_MAX_ALT   = -6;         // degrees — sun must be below this (civil twilight)
+const GOOGLE_ELEVATION_API_KEY = 'AIzaSyCzBfzymO3sYdpa2cUT5py0wZJ-R2pRip4';
 const STEP_MS       = 15 * 1000;  // 15-second scan steps
 
 function getCloseDeg()  { return parseFloat(document.getElementById('sel-threshold').value); }
 function getDaysAhead() { return Math.min(60, Math.max(1, parseInt(document.getElementById('inp-days').value) || 10)); }
 function getUnits()     { return document.getElementById('sel-units').value; }
+function getShowMode()  { return document.getElementById('sel-show').value; }
 // ────────────────────────────────────────────────────────────────────────
 
 let currentLat = null, currentLon = null;
@@ -330,7 +350,7 @@ function findPasses(lat, lon) {
     const look = satellite.ecfToLookAngles(obsGd, posEcf);
     const elev = look.elevation / DEG;
 
-    if (elev < MIN_ELEVATION) {
+    if (elev < 0) {
       if (cur) { passes.push(cur); cur = null; }
       continue;
     }
@@ -367,21 +387,38 @@ function findPasses(lat, lon) {
 
 // ── CLOSE APPROACH FINDER ─────────────────────────────────────────────────
 function addCloseApproaches(passes, lat, lon) {
+  const satrec = satellite.twoline2satrec(TLE.line1, TLE.line2);
+  const obsGd = { longitude: lon * DEG, latitude: lat * DEG, height: 0 };
+
   for (const pass of passes) {
     const midDate = new Date((pass.start.time.getTime() + pass.end.time.getTime()) / 2);
     const planets = getPlanetPositions(midDate, lat, lon);
     pass.planetPositions = planets;
     pass.closeApproaches = [];
 
+    // Build 1-second resolution ISS positions for this pass (accurate close-approach detection).
+    const finePoints = [];
+    for (let t = pass.start.time.getTime(); t <= pass.end.time.getTime(); t += 1000) {
+      const date = new Date(t);
+      const pv = satellite.propagate(satrec, date);
+      if (!pv || !pv.position || typeof pv.position === 'boolean') continue;
+      const gmst = satellite.gstime(date);
+      const posEcf = satellite.eciToEcf(pv.position, gmst);
+      const look = satellite.ecfToLookAngles(obsGd, posEcf);
+      const elev = look.elevation / DEG;
+      if (elev < 0) continue;
+      finePoints.push({ elevation: elev, azimuth: (look.azimuth / DEG + 360) % 360 });
+    }
+
     for (const [name, ppos] of Object.entries(planets)) {
       if (ppos.altitude < 0) continue;
-      let minSep = Infinity;
-      for (const pt of pass.points) {
+      let minSep = Infinity, transitElev = 0;
+      for (const pt of finePoints) {
         const sep = angSepDeg(pt.azimuth, pt.elevation, ppos.azimuth, ppos.altitude);
-        if (sep < minSep) minSep = sep;
+        if (sep < minSep) { minSep = sep; transitElev = pt.elevation; }
       }
       if (minSep <= getCloseDeg()) {
-        pass.closeApproaches.push({ planet: name, minSep: Math.round(minSep * 10) / 10 });
+        pass.closeApproaches.push({ planet: name, minSep: Math.round(minSep * 10) / 10, transitElev: Math.round(transitElev) });
       }
     }
     pass.closeApproaches.sort((a, b) => a.minSep - b.minSep);
@@ -444,8 +481,8 @@ function renderTable(passes) {
     if (pass.closeApproaches.length > 0) {
       nearHtml = pass.closeApproaches.map(ca => {
         const pColor = PLANET_COLORS[ca.planet] || '#ffc830';
-        return `<span class="badge" style="color:${pColor};border:1px solid ${pColor}55;background:#111120">${ca.planet} <span style="opacity:0.85">${ca.minSep}°</span></span>` +
-               `<button class="btn-transit" onclick="openTransitMap(${i},'${ca.planet}')">Map (nearest point: ${fmtTransitDist(ca.transitDistKm)})</button>`;
+        return `<span class="badge" style="color:${pColor};border:1px solid ${pColor}55;background:#111120">${ca.planet} <span style="opacity:0.85">${ca.minSep}° · ${ca.transitElev}° alt</span></span>` +
+               `<button class="btn-transit" onclick="openTransitMap(${pass.idx},'${ca.planet}')">Map (nearest point: ${fmtTransitDist(ca.transitDistKm)})</button>`;
       }).join(' ');
     }
 
@@ -461,7 +498,7 @@ function renderTable(passes) {
       <td>${nearHtml}</td>
     `;
     tr.onclick = () => {
-      const card = document.getElementById(`chart-${i}`);
+      const card = document.getElementById(`chart-${pass.idx}`);
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
     tbody.appendChild(tr);
@@ -580,14 +617,14 @@ function renderCharts(passes) {
     const isPlanet = pass.closeApproaches.length > 0;
     const card = document.createElement('div');
     card.className = 'chart-card' + (isPlanet ? ' planet-card' : '');
-    card.id = `chart-${i}`;
+    card.id = `chart-${pass.idx}`;
 
-    let titleHtml = `<strong>#${i + 1}</strong> ${fmtDate(pass.start.time)} · ${fmtTime(pass.start.time)}`;
+    let titleHtml = `<strong>#${pass.idx + 1}</strong> ${fmtDate(pass.start.time)} · ${fmtTime(pass.start.time)}`;
     titleHtml += ` · max ${Math.round(pass.peak.elevation)}°`;
     if (isPlanet) {
       const flags = pass.closeApproaches.map(ca =>
-        `<span class="planet-flag" style="color:${PLANET_COLORS[ca.planet] || '#ffc830'}">★ ${ca.planet} ${ca.minSep}°</span>` +
-        `<button class="btn-transit" onclick="openTransitMap(${i},'${ca.planet}')">Map (nearest point: ${fmtTransitDist(ca.transitDistKm)})</button>`
+        `<span class="planet-flag" style="color:${PLANET_COLORS[ca.planet] || '#ffc830'}">★ ${ca.planet} ${ca.minSep}° · ${ca.transitElev}° alt</span>` +
+        `<button class="btn-transit" onclick="openTransitMap(${pass.idx},'${ca.planet}')">Map (nearest point: ${fmtTransitDist(ca.transitDistKm)})</button>`
       ).join(' ');
       titleHtml += `<br>${flags}`;
     }
@@ -606,6 +643,18 @@ function renderCharts(passes) {
 
     drawSkyChart(canvas, pass);
   });
+}
+
+// ── ELEVATION API ────────────────────────────────────────────────────────
+async function fetchElevationsBatch(locations) {
+  if (!GOOGLE_ELEVATION_API_KEY) throw new Error('No Google Elevation API key set. Add it to GOOGLE_ELEVATION_API_KEY in the script.');
+  const locStr = locations.map(l => `${l.lat.toFixed(6)},${l.lon.toFixed(6)}`).join('|');
+  const url = `https://maps.googleapis.com/maps/api/elevation/json?locations=${encodeURIComponent(locStr)}&key=${GOOGLE_ELEVATION_API_KEY}`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  if (data.status !== 'OK') throw new Error(`Google API: ${data.status}`);
+  return data.results.map(r => r.elevation); // metres above sea level
 }
 
 // ── LIVE TLE FETCHING ─────────────────────────────────────────────────────
@@ -716,6 +765,23 @@ function findTransitPoint(satEci, bodyEci) {
   return { x: satEci.x + lam*dHat.x, y: satEci.y + lam*dHat.y, z: satEci.z + lam*dHat.z };
 }
 
+function findTransitPointAtElevation(satEci, bodyEci, elevKm) {
+  const R = R_EARTH_KM + elevKm;
+  const dx = satEci.x - bodyEci.x, dy = satEci.y - bodyEci.y, dz = satEci.z - bodyEci.z;
+  const dLen = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  if (dLen === 0) return null;
+  const dHat = { x: dx/dLen, y: dy/dLen, z: dz/dLen };
+  const a = satEci.x*dHat.x + satEci.y*dHat.y + satEci.z*dHat.z;
+  const c = satEci.x**2 + satEci.y**2 + satEci.z**2 - R**2;
+  const disc = a*a - c;
+  if (disc < 0) return null;
+  const sqrtDisc = Math.sqrt(disc);
+  const lam1 = -a - sqrtDisc, lam2 = -a + sqrtDisc;
+  const lam = lam1 > 0 ? lam1 : lam2 > 0 ? lam2 : null;
+  if (lam === null) return null;
+  return { x: satEci.x + lam*dHat.x, y: satEci.y + lam*dHat.y, z: satEci.z + lam*dHat.z };
+}
+
 function haversineKm(lat1, lon1, lat2, lon2) {
   const dLat = (lat2 - lat1) * DEG, dLon = (lon2 - lon1) * DEG;
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*DEG) * Math.cos(lat2*DEG) * Math.sin(dLon/2)**2;
@@ -733,7 +799,7 @@ function computeTransitPath(pass, planetName) {
   const midAstroTime = Astronomy.MakeTime(new Date((startT + endT) / 2));
   const rot = Astronomy.Rotation_EQJ_EQD(midAstroTime);
 
-  for (let t = startT; t <= endT; t += 500) {
+  for (let t = startT; t <= endT; t += 100) {
     const date = new Date(t);
     const pv = satellite.propagate(satrec, date);
     if (!pv || !pv.position || typeof pv.position === 'boolean') continue;
@@ -751,7 +817,11 @@ function computeTransitPath(pass, planetName) {
     if (!transitEci) continue;
 
     const geod = satellite.eciToGeodetic(transitEci, gmst);
-    points.push({ lat: geod.latitude / DEG, lon: geod.longitude / DEG, time: date });
+    points.push({
+      lat: geod.latitude / DEG, lon: geod.longitude / DEG, time: date,
+      satEci: { x: posEci.x, y: posEci.y, z: posEci.z },
+      bodyEci: { x: bodyEci.x, y: bodyEci.y, z: bodyEci.z },
+    });
   }
   return points;
 }
@@ -795,7 +865,64 @@ function openTransitMap(passIndex, planetName) {
 
   // Transit path polyline (gold)
   const latlngs = path.map(p => [p.lat, p.lon]);
-  L.polyline(latlngs, { color: '#ffc830', weight: 3, opacity: 0.92 }).addTo(leafletMap);
+  const seaLevelLine = L.polyline(latlngs, { color: '#ffc830', weight: 3, opacity: 0.92 }).addTo(leafletMap);
+
+  // Legend
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = () => {
+    const div = L.DomUtil.create('div', '');
+    div.style.cssText = 'background:rgba(8,8,22,0.93);color:#c0c8f0;padding:8px 12px;border-radius:6px;border:1px solid #203060;font-size:11px;line-height:2;pointer-events:none';
+    div.innerHTML =
+      '<div><span style="display:inline-block;width:22px;height:3px;background:#ffc830;margin-right:7px;vertical-align:middle"></span>Sea level</div>' +
+      '<div><span style="display:inline-block;width:22px;height:3px;background:#00d4ff;margin-right:7px;vertical-align:middle"></span>Terrain corrected</div>';
+    return div;
+  };
+  legend.addTo(leafletMap);
+
+  // Elevation correction — triggered by clicking the sea-level path line
+  async function applyElevationCorrection() {
+    if (!GOOGLE_ELEVATION_API_KEY) {
+      document.getElementById('map-elev-status').innerHTML =
+        '<span style="color:#ff8060">Add your Google Elevation API key to GOOGLE_ELEVATION_API_KEY in the script to enable terrain correction.</span>';
+      return;
+    }
+    const bounds = leafletMap.getBounds();
+    const inView = path.filter(p => bounds.contains([p.lat, p.lon]));
+    if (inView.length === 0) {
+      document.getElementById('map-elev-status').innerHTML =
+        '<span style="color:#ff8060">No transit path visible — pan to the path first.</span>';
+      return;
+    }
+    const MAX_SAMPLES = 512;
+    const step = Math.max(1, Math.ceil(inView.length / MAX_SAMPLES));
+    const sampled = inView.filter((_, i) => i % step === 0);
+    document.getElementById('map-elev-status').innerHTML =
+      `<span style="color:#6080c0">Fetching terrain elevations (${sampled.length} points)…</span>`;
+    try {
+      const elevations = await fetchElevationsBatch(sampled.map(p => ({ lat: p.lat, lon: p.lon })));
+      const correctedLatlngs = [];
+      for (let i = 0; i < sampled.length; i++) {
+        const pt = sampled[i];
+        const correctedEci = findTransitPointAtElevation(pt.satEci, pt.bodyEci, elevations[i] / 1000);
+        if (!correctedEci) continue;
+        const geod = satellite.eciToGeodetic(correctedEci, satellite.gstime(pt.time));
+        correctedLatlngs.push([geod.latitude / DEG, geod.longitude / DEG]);
+      }
+      if (correctedLatlngs.length > 1) {
+        L.polyline(correctedLatlngs, { color: '#00d4ff', weight: 3, opacity: 0.95 }).addTo(leafletMap);
+        document.getElementById('map-elev-status').innerHTML =
+          `<span style="color:#00d4ff">✓ Terrain correction applied — ${sampled.length} elevation samples across viewport. Zoom in and click again for finer correction.</span>`;
+      } else {
+        document.getElementById('map-elev-status').innerHTML =
+          '<span style="color:#ff8060">Could not compute corrected path for this area.</span>';
+      }
+    } catch (e) {
+      document.getElementById('map-elev-status').innerHTML =
+        `<span style="color:#ff8060">Elevation fetch failed: ${e.message}</span>`;
+    }
+  }
+
+  seaLevelLine.on('click', applyElevationCorrection);
 
   // Path start (cyan) and end (orange) dots
   L.circleMarker(latlngs[0], { radius: 5, color: '#00e8cc', fillColor: '#00e8cc', fillOpacity: 1, weight: 1 })
@@ -825,8 +952,9 @@ function openTransitMap(passIndex, planetName) {
   document.getElementById('map-info').innerHTML =
     `<strong>Nearest transit point:</strong> ${distStr} from your location &nbsp;·&nbsp; ` +
     `<strong>Be there at:</strong> ${fmtTime(closest.time)} local` +
-    `<br><span style="color:#40507a;font-size:0.82em">⚠ Accuracy limited by TLE precision (~100–500 m). ` +
-    `Run <code>node generate.js</code> on the day of the event for best results.</span>`;
+    `<br><span style="color:#40507a;font-size:0.82em">⚠ Accuracy limited by TLE precision (~100–500 m). Refresh ISS data on the day of the event for best results.</span>` +
+    `<br><span style="color:#506080;font-size:0.82em">Click the gold line to apply terrain elevation correction for the area currently in view.</span>`;
+  document.getElementById('map-elev-status').textContent = '';
 }
 
 function closeTransitMap() {
@@ -874,14 +1002,21 @@ async function run(lat, lon, locationName) {
   await new Promise(r => setTimeout(r, 10));
 
   addCloseApproaches(passes, lat, lon);
+  passes.forEach((p, i) => { p.idx = i; });
   currentPasses = passes;
 
   const planetCount = passes.filter(p => p.closeApproaches.length > 0).length;
-  setStatus(`Found ${passes.length} visible pass${passes.length !== 1 ? 'es' : ''} · ` +
-            `${planetCount} near a planet or Moon`);
+  const displayPasses = getShowMode() === 'planet'
+    ? passes.filter(p => p.closeApproaches.length > 0)
+    : passes;
 
-  renderTable(passes);
-  renderCharts(passes);
+  const filterNote = getShowMode() === 'planet' && displayPasses.length < passes.length
+    ? ` (filtered to ${displayPasses.length} with planet/Moon passes)`  : '';
+  setStatus(`Found ${passes.length} visible pass${passes.length !== 1 ? 'es' : ''} · ` +
+            `${planetCount} near a planet or Moon${filterNote}`);
+
+  renderTable(displayPasses);
+  renderCharts(displayPasses);
 }
 
 // ── LOCATION SETUP ────────────────────────────────────────────────────────
@@ -898,7 +1033,16 @@ function useManual() {
     return;
   }
   currentLat = lat; currentLon = lon;
-  run(lat, lon, null);
+  document.getElementById('btn-generate').disabled = false;
+  setStatus('Location set — click Generate Passes to search.');
+}
+
+function generatePasses() {
+  if (currentLat === null || currentLon === null) {
+    setStatus('Please set your location first.');
+    return;
+  }
+  run(currentLat, currentLon, null);
 }
 
 document.getElementById('btn-locate').addEventListener('click', () => {
@@ -912,7 +1056,8 @@ document.getElementById('btn-locate').addEventListener('click', () => {
     pos => {
       document.getElementById('btn-locate').disabled = false;
       currentLat = pos.coords.latitude; currentLon = pos.coords.longitude;
-      run(currentLat, currentLon, null);
+      document.getElementById('btn-generate').disabled = false;
+      setStatus('Location detected — click Generate Passes to search.');
     },
     err => {
       document.getElementById('btn-locate').disabled = false;
@@ -930,11 +1075,12 @@ document.getElementById('inp-lon').addEventListener('keydown', e => {
 
 // ── Re-run when settings change (if location already set) ─────────────────
 function onSettingChange() {
-  if (currentLat !== null && currentLon !== null) run(currentLat, currentLon, null);
+  // Settings changes don't auto-run — user clicks Generate Passes
 }
 document.getElementById('sel-threshold').addEventListener('change', onSettingChange);
 document.getElementById('inp-days').addEventListener('change', onSettingChange);
 document.getElementById('sel-units').addEventListener('change', onSettingChange);
+document.getElementById('sel-show').addEventListener('change', onSettingChange);
 
 // Auto-fetch TLE on every page load
 initTLE();
