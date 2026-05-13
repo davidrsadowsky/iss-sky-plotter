@@ -224,7 +224,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26133.16648102  .00004986  00000+0  97915-4 0  9994","line2":"2 25544  51.6312 113.4597 0007515  53.2822 306.8856 15.49201863566327","epoch":"Wed, 13 May 2026 03:59:00 UTC","generated":"5/13/2026, 7:38:49 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26133.16648102  .00004986  00000+0  97915-4 0  9994","line2":"2 25544  51.6312 113.4597 0007515  53.2822 306.8856 15.49201863566327","epoch":"Wed, 13 May 2026 03:59:00 UTC","generated":"5/13/2026, 7:53:40 AM"}
 </script>
 
 <script>
@@ -646,36 +646,26 @@ function renderCharts(passes) {
 }
 
 // ── ELEVATION API ────────────────────────────────────────────────────────
-// Uses Google Maps JavaScript API ElevationService — browser-compatible,
-// CORS handled internally by the Maps JS library. REST endpoint cannot be
-// called directly from a browser due to missing CORS headers.
+// Primary: Google Elevation via corsproxy.io (512 locations, high accuracy).
+// Fallback: Open-Topo-Data (100 locations, CORS-native, no key needed).
 
-function loadGoogleMapsAPI() {
-  return new Promise((resolve, reject) => {
-    if (window.google && window.google.maps && window.google.maps.ElevationService) {
-      resolve(); return;
-    }
-    window._googleMapsReady = resolve;
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_ELEVATION_API_KEY}&callback=_googleMapsReady`;
-    script.onerror = () => reject(new Error('Failed to load Google Maps JS API'));
-    document.head.appendChild(script);
-  });
+async function fetchElevationsGoogle(locations) {
+  const locStr = locations.map(l => `${l.lat.toFixed(6)},${l.lon.toFixed(6)}`).join('|');
+  const googleUrl = `https://maps.googleapis.com/maps/api/elevation/json?locations=${encodeURIComponent(locStr)}&key=${GOOGLE_ELEVATION_API_KEY}`;
+  const resp = await fetch(`https://corsproxy.io/?${encodeURIComponent(googleUrl)}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  if (data.status !== 'OK') throw new Error(`Google: ${data.status}`);
+  return data.results.map(r => r.elevation);
 }
 
-async function fetchElevationsBatch(locations) {
-  if (!GOOGLE_ELEVATION_API_KEY) throw new Error('No Google Elevation API key configured.');
-  await loadGoogleMapsAPI();
-  return new Promise((resolve, reject) => {
-    const elevator = new google.maps.ElevationService();
-    elevator.getElevationForLocations(
-      { locations: locations.map(l => ({ lat: l.lat, lng: l.lon })) },
-      (results, status) => {
-        if (status === 'OK') resolve(results.map(r => r.elevation));
-        else reject(new Error(`Google Maps Elevation: ${status}`));
-      }
-    );
-  });
+async function fetchElevationsOpenTopo(locations) {
+  const locStr = locations.map(l => `${l.lat.toFixed(6)},${l.lon.toFixed(6)}`).join('|');
+  const resp = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${locStr}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  if (data.status !== 'OK') throw new Error(`OpenTopo: ${data.status}`);
+  return data.results.map(r => r.elevation);
 }
 
 // ── LIVE TLE FETCHING ─────────────────────────────────────────────────────
@@ -914,13 +904,31 @@ function openTransitMap(passIndex, planetName) {
         '<span style="color:#ff8060">No transit path visible — pan to the path first.</span>';
       return;
     }
-    const MAX_SAMPLES = 512;
-    const step = Math.max(1, Math.ceil(inView.length / MAX_SAMPLES));
-    const sampled = inView.filter((_, i) => i % step === 0);
-    document.getElementById('map-elev-status').innerHTML =
-      `<span style="color:#6080c0">Fetching terrain elevations (${sampled.length} points)…</span>`;
+    const elevStatus = document.getElementById('map-elev-status');
+    elevStatus.innerHTML = `<span style="color:#6080c0">Fetching terrain elevations…</span>`;
+
+    // Try Google via corsproxy.io (512 samples). On failure, fall back to Open-Topo-Data (100 samples).
+    let sampled, elevations, source;
     try {
-      const elevations = await fetchElevationsBatch(sampled.map(p => ({ lat: p.lat, lon: p.lon })));
+      const step = Math.max(1, Math.ceil(inView.length / 512));
+      sampled = inView.filter((_, i) => i % step === 0);
+      elevStatus.innerHTML = `<span style="color:#6080c0">Fetching via Google (${sampled.length} points)…</span>`;
+      elevations = await fetchElevationsGoogle(sampled.map(p => ({ lat: p.lat, lon: p.lon })));
+      source = 'Google Elevation';
+    } catch (primaryErr) {
+      try {
+        const step = Math.max(1, Math.ceil(inView.length / 100));
+        sampled = inView.filter((_, i) => i % step === 0);
+        elevStatus.innerHTML = `<span style="color:#6080c0">Google unavailable — trying Open-Topo-Data (${sampled.length} points)…</span>`;
+        elevations = await fetchElevationsOpenTopo(sampled.map(p => ({ lat: p.lat, lon: p.lon })));
+        source = 'Open-Topo-Data (fallback)';
+      } catch (fallbackErr) {
+        elevStatus.innerHTML = `<span style="color:#ff8060">Elevation fetch failed. Google: ${primaryErr.message} · Fallback: ${fallbackErr.message}</span>`;
+        return;
+      }
+    }
+
+    try {
       const correctedLatlngs = [];
       for (let i = 0; i < sampled.length; i++) {
         const pt = sampled[i];
@@ -931,15 +939,13 @@ function openTransitMap(passIndex, planetName) {
       }
       if (correctedLatlngs.length > 1) {
         L.polyline(correctedLatlngs, { color: '#00d4ff', weight: 3, opacity: 0.95 }).addTo(leafletMap);
-        document.getElementById('map-elev-status').innerHTML =
-          `<span style="color:#00d4ff">✓ Terrain correction applied — ${sampled.length} elevation samples across viewport. Zoom in and click again for finer correction.</span>`;
+        elevStatus.innerHTML =
+          `<span style="color:#00d4ff">✓ Terrain correction applied — ${sampled.length} samples via ${source}. Zoom in and click again for finer correction.</span>`;
       } else {
-        document.getElementById('map-elev-status').innerHTML =
-          '<span style="color:#ff8060">Could not compute corrected path for this area.</span>';
+        elevStatus.innerHTML = '<span style="color:#ff8060">Could not compute corrected path for this area.</span>';
       }
     } catch (e) {
-      document.getElementById('map-elev-status').innerHTML =
-        `<span style="color:#ff8060">Elevation fetch failed: ${e.message}</span>`;
+      elevStatus.innerHTML = `<span style="color:#ff8060">Error applying correction: ${e.message}</span>`;
     }
   }
 
