@@ -224,7 +224,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26133.16648102  .00004986  00000+0  97915-4 0  9994","line2":"2 25544  51.6312 113.4597 0007515  53.2822 306.8856 15.49201863566327","epoch":"Wed, 13 May 2026 03:59:00 UTC","generated":"5/13/2026, 8:03:09 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26133.16648102  .00004986  00000+0  97915-4 0  9994","line2":"2 25544  51.6312 113.4597 0007515  53.2822 306.8856 15.49201863566327","epoch":"Wed, 13 May 2026 03:59:00 UTC","generated":"5/13/2026, 8:08:05 AM"}
 </script>
 
 <script>
@@ -880,6 +880,7 @@ function openTransitMap(passIndex, planetName) {
 
   // Legend
   let legendDiv;
+  const correctedLayers = [];
   const legend = L.control({ position: 'bottomright' });
   legend.onAdd = () => {
     legendDiv = L.DomUtil.create('div', '');
@@ -893,8 +894,29 @@ function openTransitMap(passIndex, planetName) {
 
   // Elevation correction — triggered by clicking the sea-level path line
   async function applyElevationCorrection() {
+    // Clear any previous corrected layers
+    correctedLayers.forEach(l => leafletMap.removeLayer(l));
+    correctedLayers.length = 0;
+
     const bounds = leafletMap.getBounds();
-    const inView = path.filter(p => bounds.contains([p.lat, p.lon]));
+    const center = bounds.getCenter();
+
+    // Find path points in viewport. If the viewport is zoomed so tight that no
+    // pre-computed points fall inside it (points are ~770 m apart), expand the
+    // search progressively until we find coverage.
+    let inView = path.filter(p => bounds.contains([p.lat, p.lon]));
+    if (inView.length < 2) inView = path.filter(p => bounds.pad(1.0).contains([p.lat, p.lon]));
+    if (inView.length < 2) {
+      // Last resort: find the nearest path point to the viewport centre and
+      // take a ±30-point window around it.
+      let minDist = Infinity, nearestIdx = 0;
+      path.forEach((p, i) => {
+        const d = haversineKm(center.lat, center.lng, p.lat, p.lon);
+        if (d < minDist) { minDist = d; nearestIdx = i; }
+      });
+      const s = Math.max(0, nearestIdx - 30), e = Math.min(path.length - 1, nearestIdx + 30);
+      inView = path.slice(s, e + 1);
+    }
     if (inView.length < 2) {
       document.getElementById('map-elev-status').innerHTML =
         '<span style="color:#ff8060">No transit path visible — pan to the path first.</span>';
@@ -956,7 +978,7 @@ function openTransitMap(passIndex, planetName) {
       correctedLatlngs.push([geod.latitude / DEG, geod.longitude / DEG]);
     }
     if (correctedLatlngs.length > 1) {
-      L.polyline(correctedLatlngs, { color: '#00d4ff', weight: 3, opacity: 0.95 }).addTo(leafletMap);
+      correctedLayers.push(L.polyline(correctedLatlngs, { color: '#00d4ff', weight: 3, opacity: 0.95 }).addTo(leafletMap));
       elevStatus.innerHTML =
         `<span style="color:#00d4ff">✓ Terrain correction applied — ${samples.length} samples via ${source}. Zoom in and click again for finer correction.</span>`;
       if (legendDiv) legendDiv.innerHTML =
