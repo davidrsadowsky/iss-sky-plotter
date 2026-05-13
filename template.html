@@ -893,59 +893,83 @@ function openTransitMap(passIndex, planetName) {
   legend.addTo(leafletMap);
 
   // Elevation correction — triggered by clicking the sea-level path line
-  async function applyElevationCorrection() {
-    // Clear any previous corrected layers
+  async function applyElevationCorrection(clickedLatLng) {
     correctedLayers.forEach(l => leafletMap.removeLayer(l));
     correctedLayers.length = 0;
 
-    const bounds = leafletMap.getBounds();
-    const center = bounds.getCenter();
+    const elevStatus = document.getElementById('map-elev-status');
 
-    // Find path points in viewport. If the viewport is zoomed so tight that no
-    // pre-computed points fall inside it (points are ~770 m apart), expand the
-    // search progressively until we find coverage.
-    let inView = path.filter(p => bounds.contains([p.lat, p.lon]));
-    if (inView.length < 2) inView = path.filter(p => bounds.pad(1.0).contains([p.lat, p.lon]));
-    if (inView.length < 2) {
-      // Last resort: find the nearest path point to the viewport centre and
-      // take a ±30-point window around it.
-      let minDist = Infinity, nearestIdx = 0;
-      path.forEach((p, i) => {
-        const d = haversineKm(center.lat, center.lng, p.lat, p.lon);
-        if (d < minDist) { minDist = d; nearestIdx = i; }
-      });
-      const s = Math.max(0, nearestIdx - 30), e = Math.min(path.length - 1, nearestIdx + 30);
-      inView = path.slice(s, e + 1);
-    }
-    if (inView.length < 2) {
-      document.getElementById('map-elev-status').innerHTML =
-        '<span style="color:#ff8060">No transit path visible — pan to the path first.</span>';
+    // Step 1: find nearest pre-computed path point to the click (coarse anchor)
+    let nearestIdx = 0, coarseDist = Infinity;
+    path.forEach((p, i) => {
+      const d = haversineKm(clickedLatLng.lat, clickedLatLng.lng, p.lat, p.lon);
+      if (d < coarseDist) { coarseDist = d; nearestIdx = i; }
+    });
+    if (coarseDist > 500) {
+      elevStatus.innerHTML = '<span style="color:#ff8060">No transit path nearby — pan to the path first.</span>';
       return;
     }
-    const elevStatus = document.getElementById('map-elev-status');
-    elevStatus.innerHTML = `<span style="color:#6080c0">Computing samples…</span>`;
 
-    // Always use the full sample budget evenly distributed across the VISIBLE TIME WINDOW.
-    // More zoom = same number of samples over less distance = higher spatial resolution.
-    const tStart = inView[0].time.getTime();
-    const tEnd   = inView[inView.length - 1].time.getTime();
+    // Step 2: fine search ±10 s at 0.01 s resolution to find the exact transit
+    // time that corresponds to where the user clicked on the line.
+    elevStatus.innerHTML = `<span style="color:#6080c0">Pinpointing click position on path…</span>`;
+    const satrec = satellite.twoline2satrec(TLE.line1, TLE.line2);
+    const body   = Astronomy.Body[planetName];
+    const t0     = path[nearestIdx].time.getTime();
+    const rot    = Astronomy.Rotation_EQJ_EQD(Astronomy.MakeTime(new Date(t0)));
 
+    let clickTime = t0, fineDist = coarseDist;
+    for (let t = t0 - 10000; t <= t0 + 10000; t += 10) {
+      const date = new Date(t);
+      const pv = satellite.propagate(satrec, date);
+      if (!pv || !pv.position || typeof pv.position === 'boolean') continue;
+      const posEci = pv.position;
+      const vecEqd = Astronomy.RotateVector(rot, Astronomy.GeoVector(body, Astronomy.MakeTime(date), false));
+      const bodyEci = { x: vecEqd.x * AU_KM, y: vecEqd.y * AU_KM, z: vecEqd.z * AU_KM };
+      const transitEci = findTransitPoint(posEci, bodyEci);
+      if (!transitEci) continue;
+      const geod = satellite.eciToGeodetic(transitEci, satellite.gstime(date));
+      const d = haversineKm(clickedLatLng.lat, clickedLatLng.lng, geod.latitude / DEG, geod.longitude / DEG);
+      if (d < fineDist) { fineDist = d; clickTime = t; }
+    }
+
+    // Step 3: determine time window centred on clickTime from viewport size.
+    // Walk outward through path points while inside padded bounds.
+    // If zoom is too high for any path points to be in bounds, estimate from viewport size.
+    const bounds = leafletMap.getBounds();
+    const padded = bounds.pad(0.3);
+    let lo = nearestIdx, hi = nearestIdx;
+    while (lo > 0               && padded.contains([path[lo - 1].lat, path[lo - 1].lon])) lo--;
+    while (hi < path.length - 1 && padded.contains([path[hi + 1].lat, path[hi + 1].lon])) hi++;
+
+    let tStart, tEnd;
+    if (hi - lo >= 4) {
+      tStart = path[lo].time.getTime();
+      tEnd   = path[hi].time.getTime();
+    } else {
+      // Viewport smaller than path point spacing — estimate window from viewport height in km
+      const latSpanKm = Math.abs(bounds.getNorth() - bounds.getSouth()) * 111;
+      const halfMs = Math.max(5000, (latSpanKm / 7.7) * 1000);
+      tStart = clickTime - halfMs;
+      tEnd   = clickTime + halfMs;
+    }
+    tStart = Math.max(pass.start.time.getTime(), tStart);
+    tEnd   = Math.min(pass.end.time.getTime(),   tEnd);
+
+    // Step 4: build evenly-spaced sample points and fetch elevations
     function buildSamples(n) {
-      const satrec = satellite.twoline2satrec(TLE.line1, TLE.line2);
-      const body   = Astronomy.Body[planetName];
-      const rot    = Astronomy.Rotation_EQJ_EQD(Astronomy.MakeTime(new Date((tStart + tEnd) / 2)));
+      const r = Astronomy.Rotation_EQJ_EQD(Astronomy.MakeTime(new Date((tStart + tEnd) / 2)));
       const pts = [];
       for (let i = 0; i < n; i++) {
         const date = new Date(tStart + (tEnd - tStart) * i / Math.max(n - 1, 1));
         const pv = satellite.propagate(satrec, date);
         if (!pv || !pv.position || typeof pv.position === 'boolean') continue;
         const posEci = pv.position;
-        const gmst   = satellite.gstime(date);
-        const vecEqd = Astronomy.RotateVector(rot, Astronomy.GeoVector(body, Astronomy.MakeTime(date), false));
+        const vecEqd = Astronomy.RotateVector(r, Astronomy.GeoVector(body, Astronomy.MakeTime(date), false));
         const bodyEci = { x: vecEqd.x * AU_KM, y: vecEqd.y * AU_KM, z: vecEqd.z * AU_KM };
         const transitEci = findTransitPoint(posEci, bodyEci);
         if (!transitEci) continue;
-        const geod = satellite.eciToGeodetic(transitEci, gmst);
+        const geod = satellite.eciToGeodetic(transitEci, satellite.gstime(date));
         pts.push({ lat: geod.latitude / DEG, lon: geod.longitude / DEG, time: date, satEci: posEci, bodyEci });
       }
       return pts;
@@ -989,7 +1013,7 @@ function openTransitMap(passIndex, planetName) {
     }
   }
 
-  seaLevelLine.on('click', applyElevationCorrection);
+  seaLevelLine.on('click', e => applyElevationCorrection(e.latlng));
 
   // Path start (cyan) and end (orange) dots
   L.circleMarker(latlngs[0], { radius: 5, color: '#00e8cc', fillColor: '#00e8cc', fillOpacity: 1, weight: 1 })
