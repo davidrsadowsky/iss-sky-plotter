@@ -224,7 +224,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26133.16648102  .00004986  00000+0  97915-4 0  9994","line2":"2 25544  51.6312 113.4597 0007515  53.2822 306.8856 15.49201863566327","epoch":"Wed, 13 May 2026 03:59:00 UTC","generated":"5/13/2026, 7:26:07 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26133.16648102  .00004986  00000+0  97915-4 0  9994","line2":"2 25544  51.6312 113.4597 0007515  53.2822 306.8856 15.49201863566327","epoch":"Wed, 13 May 2026 03:59:00 UTC","generated":"5/13/2026, 7:38:49 AM"}
 </script>
 
 <script>
@@ -646,15 +646,36 @@ function renderCharts(passes) {
 }
 
 // ── ELEVATION API ────────────────────────────────────────────────────────
+// Uses Google Maps JavaScript API ElevationService — browser-compatible,
+// CORS handled internally by the Maps JS library. REST endpoint cannot be
+// called directly from a browser due to missing CORS headers.
+
+function loadGoogleMapsAPI() {
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.maps && window.google.maps.ElevationService) {
+      resolve(); return;
+    }
+    window._googleMapsReady = resolve;
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_ELEVATION_API_KEY}&callback=_googleMapsReady`;
+    script.onerror = () => reject(new Error('Failed to load Google Maps JS API'));
+    document.head.appendChild(script);
+  });
+}
+
 async function fetchElevationsBatch(locations) {
-  if (!GOOGLE_ELEVATION_API_KEY) throw new Error('No Google Elevation API key set. Add it to GOOGLE_ELEVATION_API_KEY in the script.');
-  const locStr = locations.map(l => `${l.lat.toFixed(6)},${l.lon.toFixed(6)}`).join('|');
-  const url = `https://maps.googleapis.com/maps/api/elevation/json?locations=${encodeURIComponent(locStr)}&key=${GOOGLE_ELEVATION_API_KEY}`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const data = await resp.json();
-  if (data.status !== 'OK') throw new Error(`Google API: ${data.status}`);
-  return data.results.map(r => r.elevation); // metres above sea level
+  if (!GOOGLE_ELEVATION_API_KEY) throw new Error('No Google Elevation API key configured.');
+  await loadGoogleMapsAPI();
+  return new Promise((resolve, reject) => {
+    const elevator = new google.maps.ElevationService();
+    elevator.getElevationForLocations(
+      { locations: locations.map(l => ({ lat: l.lat, lng: l.lon })) },
+      (results, status) => {
+        if (status === 'OK') resolve(results.map(r => r.elevation));
+        else reject(new Error(`Google Maps Elevation: ${status}`));
+      }
+    );
+  });
 }
 
 // ── LIVE TLE FETCHING ─────────────────────────────────────────────────────
