@@ -224,7 +224,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26133.42450845  .00004975  00000+0  97698-4 0  9994","line2":"2 25544  51.6312 112.1826 0007529  54.1813 305.9874 15.49204198566361","epoch":"Wed, 13 May 2026 10:11:00 UTC","generated":"5/13/2026, 8:59:48 PM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26133.42450845  .00004975  00000+0  97698-4 0  9994","line2":"2 25544  51.6312 112.1826 0007529  54.1813 305.9874 15.49204198566361","epoch":"Wed, 13 May 2026 10:11:00 UTC","generated":"5/13/2026, 9:26:50 PM"}
 </script>
 
 <script>
@@ -994,7 +994,7 @@ function openTransitMap(passIndex, planetName) {
     if (correctedLatlngs.length > 1) {
       correctedLayers.push(L.polyline(correctedLatlngs, { color: '#00d4ff', weight: 3, opacity: 0.95 }).addTo(leafletMap));
       elevStatus.innerHTML =
-        `<span style="color:#00d4ff">✓ Terrain correction applied — ${samples.length} samples via ${source}. Zoom in and click again for finer correction.</span>`;
+        `<span style="color:#00d4ff">✓ Elevation correction and path precision improvement applied — ${samples.length} samples via ${source}.</span>`;
       if (legendDiv) legendDiv.innerHTML =
         '<div><span style="display:inline-block;width:22px;height:3px;background:#ffc830;margin-right:7px;vertical-align:middle"></span>Sea level</div>' +
         `<div><span style="display:inline-block;width:22px;height:3px;background:#00d4ff;margin-right:7px;vertical-align:middle"></span>Terrain corrected (${source})</div>`;
@@ -1034,7 +1034,7 @@ function openTransitMap(passIndex, planetName) {
     `<strong>Nearest transit point:</strong> ${distStr} from your location &nbsp;·&nbsp; ` +
     `<strong>Be there at:</strong> ${fmtTime(closest.time)} local` +
     `<br><span style="color:#40507a;font-size:0.82em">⚠ Accuracy limited by TLE precision (~100–500 m). Refresh ISS data on the day of the event for best results.</span>` +
-    `<br><span style="color:#506080;font-size:0.82em">For best accuracy, zoom into your target area first, then click the gold line to apply terrain elevation correction. Click again after zooming for finer results.</span>`;
+    `<br><span style="color:#506080;font-size:0.82em">Click the gold line to apply elevation correction and improve path precision for the current view. Zoom in for higher accuracy.</span>`;
   document.getElementById('map-elev-status').textContent = '';
 }
 
