@@ -224,7 +224,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26133.16648102  .00004986  00000+0  97915-4 0  9994","line2":"2 25544  51.6312 113.4597 0007514  53.2822 306.8856 15.49201863566326","epoch":"Wed, 13 May 2026 03:59:00 UTC","generated":"5/13/2026, 9:52:56 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26133.42450845  .00004975  00000+0  97698-4 0  9994","line2":"2 25544  51.6312 112.1826 0007529  54.1813 305.9874 15.49204198566361","epoch":"Wed, 13 May 2026 10:11:00 UTC","generated":"5/13/2026, 8:59:48 PM"}
 </script>
 
 <script>
@@ -934,27 +934,17 @@ function openTransitMap(passIndex, planetName) {
     }
 
     // Step 3: determine time window centred on clickTime from viewport size.
-    // Walk outward through path points while inside padded bounds.
-    // If zoom is too high for any path points to be in bounds, estimate from viewport size.
+    // Window covers ~2× the viewport width on each side of the click —
+    // the more zoomed in, the tighter and more precise the corrected segment.
+    // Minimum 100 ms = ~770 m of path so the result is always visible.
     const bounds = leafletMap.getBounds();
-    const padded = bounds.pad(0.3);
-    let lo = nearestIdx, hi = nearestIdx;
-    while (lo > 0               && padded.contains([path[lo - 1].lat, path[lo - 1].lon])) lo--;
-    while (hi < path.length - 1 && padded.contains([path[hi + 1].lat, path[hi + 1].lon])) hi++;
-
-    let tStart, tEnd;
-    if (hi - lo >= 4) {
-      tStart = path[lo].time.getTime();
-      tEnd   = path[hi].time.getTime();
-    } else {
-      // Viewport smaller than path point spacing — estimate window from viewport height in km
-      const latSpanKm = Math.abs(bounds.getNorth() - bounds.getSouth()) * 111;
-      const halfMs = Math.max(5000, (latSpanKm / 7.7) * 1000);
-      tStart = clickTime - halfMs;
-      tEnd   = clickTime + halfMs;
-    }
-    tStart = Math.max(pass.start.time.getTime(), tStart);
-    tEnd   = Math.min(pass.end.time.getTime(),   tEnd);
+    const latSpanKm = Math.abs(bounds.getNorth() - bounds.getSouth()) * 111;
+    const lonSpanKm = Math.abs(bounds.getEast() - bounds.getWest()) * 111
+                      * Math.cos(clickedLatLng.lat * DEG);
+    const viewportKm = Math.max(latSpanKm, lonSpanKm);
+    const halfMs = Math.max(100, (viewportKm / 7.7) * 1000);
+    const tStart = Math.max(pass.start.time.getTime(), clickTime - halfMs);
+    const tEnd   = Math.min(pass.end.time.getTime(),   clickTime + halfMs);
 
     // Step 4: build evenly-spaced sample points and fetch elevations
     function buildSamples(n) {
