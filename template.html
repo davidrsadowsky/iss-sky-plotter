@@ -232,8 +232,6 @@
         <th>Date</th>
         <th>Time</th>
         <th>Peak</th>
-        <th>Duration</th>
-        <th>Max Alt</th>
         <th>Direction</th>
         <th>Object / Altitude / Distance</th>
         <th>Map</th>
@@ -543,8 +541,6 @@ function renderTable(passes) {
       <td>${fmtDate(pass.start.time)}</td>
       <td>${fmtTime(pass.start.time)} – ${fmtTime(pass.end.time)}</td>
       <td>${fmtTime(pass.peak.time)}</td>
-      <td>${dur}</td>
-      <td class="${elevClass}">${Math.round(elev)}°</td>
       <td>${dir}</td>
       <td>${nearHtml}</td>
       <td>${mapHtml}</td>
