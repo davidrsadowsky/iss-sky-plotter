@@ -127,6 +127,18 @@
       font-size: 0.82em; margin-left: 4px; vertical-align: middle; line-height: 1.4;
     }
     .btn-transit:hover { background: #2a1f00; }
+
+    @media (max-width: 640px) {
+      body { padding: 12px 10px; }
+      h1 { font-size: 1.3em; }
+      .table-scroll-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      #pass-table { font-size: 0.78em; min-width: 580px; }
+      #pass-table thead th, #pass-table tbody td { padding: 5px 7px; }
+      .btn-transit { display: block; margin: 4px 0 0 0; font-size: 0.8em; }
+      #settings-bar { gap: 10px; padding: 10px 12px; }
+      #map-panel { width: 97%; padding: 10px; max-height: 92vh; overflow-y: auto; }
+      #map-container { height: 52vh; }
+    }
   </style>
 </head>
 <body>
@@ -151,9 +163,9 @@
   <span>
     <label for="sel-threshold">Planet distance threshold:</label>
     <select id="sel-threshold">
-      <option value="5">5°</option>
+      <option value="5" selected>5°</option>
       <option value="4">4°</option>
-      <option value="3" selected>3°</option>
+      <option value="3">3°</option>
       <option value="2">2°</option>
       <option value="1">1°</option>
     </select>
@@ -186,6 +198,7 @@
 
 <div id="results">
   <p id="loc-display"></p>
+  <div class="table-scroll-wrap">
   <table id="pass-table">
     <thead>
       <tr>
@@ -202,9 +215,6 @@
     </thead>
     <tbody id="pass-tbody"></tbody>
   </table>
-  <div id="charts-section">
-    <h2>Sky Charts</h2>
-    <div id="charts-grid"></div>
   </div>
   <p id="no-passes" style="display:none">No visible ISS passes found for this location and time range.</p>
 </div>
@@ -992,7 +1002,9 @@ function openTransitMap(passIndex, planetName) {
       correctedLatlngs.push([geod.latitude / DEG, geod.longitude / DEG]);
     }
     if (correctedLatlngs.length > 1) {
-      correctedLayers.push(L.polyline(correctedLatlngs, { color: '#00d4ff', weight: 3, opacity: 0.95 }).addTo(leafletMap));
+      const corrLine = L.polyline(correctedLatlngs, { color: '#00d4ff', weight: 3, opacity: 0.95 }).addTo(leafletMap);
+      corrLine.on('click', e => applyElevationCorrection(e.latlng));
+      correctedLayers.push(corrLine);
       elevStatus.innerHTML =
         `<span style="color:#00d4ff">✓ Elevation correction and path precision improvement applied — ${samples.length} samples via ${source}.</span>`;
       if (legendDiv) legendDiv.innerHTML =
