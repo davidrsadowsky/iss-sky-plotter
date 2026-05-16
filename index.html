@@ -158,7 +158,7 @@
       body { padding: 12px 10px; }
       h1 { font-size: 1.3em; }
       .table-scroll-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      #pass-table { font-size: 0.78em; min-width: 580px; }
+      #pass-table { font-size: 0.78em; min-width: 680px; }
       #pass-table thead th, #pass-table tbody td { padding: 5px 7px; }
       .btn-transit { display: block; margin: 4px 0 0 0; font-size: 0.8em; }
       #settings-bar { gap: 10px; padding: 10px 12px; }
@@ -236,7 +236,8 @@
         <th>Duration</th>
         <th>Max Alt</th>
         <th>Direction</th>
-        <th>Near Planet / Moon</th>
+        <th>Object / Altitude / Distance</th>
+        <th>Map</th>
         <th>Sky Chart</th>
       </tr>
     </thead>
@@ -272,7 +273,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26135.16618096  .00004382  00000+0  87007-4 0  9996","line2":"2 25544  51.6313 103.5621 0007452  60.7339 299.4393 15.49219006566637","epoch":"Fri, 15 May 2026 03:59:00 UTC","generated":"5/16/2026, 12:28:06 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26135.16618096  .00004382  00000+0  87007-4 0  9996","line2":"2 25544  51.6313 103.5621 0007452  60.7339 299.4393 15.49219006566637","epoch":"Fri, 15 May 2026 03:59:00 UTC","generated":"5/16/2026, 12:39:11 AM"}
 </script>
 
 <script>
@@ -526,12 +527,16 @@ function renderTable(passes) {
     const dir = startComp === endComp ? startComp : `${startComp} → ${endComp}`;
 
     let nearHtml = '—';
+    let mapHtml  = '—';
     if (pass.closeApproaches.length > 0) {
       nearHtml = pass.closeApproaches.map(ca => {
         const pColor = PLANET_COLORS[ca.planet] || '#ffc830';
-        return `<span class="badge" style="color:${pColor};border:1px solid ${pColor}55;background:#111120">${ca.planet} <span style="opacity:0.85">${ca.minSep}° · ${ca.transitElev}° alt</span></span>` +
-               `<button class="btn-transit" onclick="openTransitMap(${pass.idx},'${ca.planet}')">Map (nearest point: ${fmtTransitDist(ca.transitDistKm)})</button>`;
-      }).join(' ');
+        return `<span style="color:${pColor};font-weight:600">${ca.planet}</span>` +
+               ` · ${ca.minSep}° · ${ca.transitElev}° alt · nearest ${fmtTransitDist(ca.transitDistKm)}`;
+      }).join('<br>');
+      mapHtml = pass.closeApproaches.map(ca =>
+        `<button class="btn-transit" onclick="openTransitMap(${pass.idx},'${ca.planet}')">Map</button>`
+      ).join(' ');
     }
 
     tr.innerHTML = `
@@ -544,6 +549,7 @@ function renderTable(passes) {
       <td class="${elevClass}">${Math.round(elev)}°</td>
       <td>${dir}</td>
       <td>${nearHtml}</td>
+      <td>${mapHtml}</td>
       <td><button class="btn-chart" onclick="openChartModal(${pass.idx})">Chart</button></td>
     `;
     tbody.appendChild(tr);
