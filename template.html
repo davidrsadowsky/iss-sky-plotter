@@ -1066,8 +1066,11 @@ function openTransitMap(passIndex, planetName) {
     }
     if (correctedLatlngs.length > 1) {
       const corrLine = L.polyline(correctedLatlngs, { color: '#00d4ff', weight: 3, opacity: 0.95 }).addTo(leafletMap);
+      const corrHit = L.polyline(correctedLatlngs, { color: '#00d4ff', weight: 24, opacity: 0, interactive: true })
+        .addTo(leafletMap)
+        .on('click', e => applyElevationCorrection(e.latlng));
       corrLine.on('click', e => applyElevationCorrection(e.latlng));
-      correctedLayers.push(corrLine);
+      correctedLayers.push(corrLine, corrHit);
       elevStatus.innerHTML =
         `<span style="color:#00d4ff">✓ Elevation correction and path precision improvement applied — ${samples.length} samples via ${source}.</span>`;
       if (legendDiv) legendDiv.innerHTML =
@@ -1078,6 +1081,10 @@ function openTransitMap(passIndex, planetName) {
     }
   }
 
+  // Wide invisible hit area so the line is easy to tap on mobile
+  L.polyline(latlngs, { color: '#ffc830', weight: 24, opacity: 0, interactive: true })
+    .addTo(leafletMap)
+    .on('click', e => applyElevationCorrection(e.latlng));
   seaLevelLine.on('click', e => applyElevationCorrection(e.latlng));
 
   // Path start (cyan) and end (orange) dots
