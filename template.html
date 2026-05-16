@@ -127,6 +127,32 @@
       font-size: 0.82em; margin-left: 4px; vertical-align: middle; line-height: 1.4;
     }
     .btn-transit:hover { background: #2a1f00; }
+    .btn-chart {
+      background: none; border: 1px solid #2a3880; color: #6878d0;
+      border-radius: 3px; padding: 1px 7px; cursor: pointer;
+      font-size: 0.82em; vertical-align: middle; line-height: 1.4;
+    }
+    .btn-chart:hover { background: #10102a; }
+    #chart-modal {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.78);
+      align-items: center; justify-content: center;
+    }
+    #chart-panel {
+      background: #0d0d22; border: 1px solid #4060c0; border-radius: 10px;
+      padding: 16px;
+    }
+    #chart-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 12px; gap: 10px;
+    }
+    #chart-modal-title { color: #8090e0; font-weight: 600; font-size: 0.85em; line-height: 1.4; }
+    #chart-modal-close {
+      background: none; border: 1px solid #3040a0; color: #8090e0;
+      border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 1em; flex-shrink: 0;
+    }
+    #chart-modal-close:hover { background: #1a1a3a; }
+    #chart-canvas-wrap canvas { display: block; border-radius: 4px; }
 
     @media (max-width: 640px) {
       body { padding: 12px 10px; }
@@ -211,6 +237,7 @@
         <th>Max Alt</th>
         <th>Direction</th>
         <th>Near Planet / Moon</th>
+        <th>Sky Chart</th>
       </tr>
     </thead>
     <tbody id="pass-tbody"></tbody>
@@ -229,6 +256,17 @@
     <div id="map-info"></div>
     <div id="map-elev-status" style="font-size:0.82em;margin-bottom:8px;min-height:1.2em"></div>
     <div id="map-container"></div>
+  </div>
+</div>
+
+<!-- Sky chart modal -->
+<div id="chart-modal">
+  <div id="chart-panel">
+    <div id="chart-header">
+      <span id="chart-modal-title"></span>
+      <button id="chart-modal-close" onclick="closeChartModal()">✕ Close</button>
+    </div>
+    <div id="chart-canvas-wrap"></div>
   </div>
 </div>
 
@@ -506,11 +544,8 @@ function renderTable(passes) {
       <td class="${elevClass}">${Math.round(elev)}°</td>
       <td>${dir}</td>
       <td>${nearHtml}</td>
+      <td><button class="btn-chart" onclick="openChartModal(${pass.idx})">Chart</button></td>
     `;
-    tr.onclick = () => {
-      const card = document.getElementById(`chart-${pass.idx}`);
-      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    };
     tbody.appendChild(tr);
   });
 }
@@ -847,6 +882,28 @@ function computeTransitPath(pass, planetName) {
   return points;
 }
 
+function openChartModal(passIdx) {
+  const pass = currentPasses[passIdx];
+  if (!pass) return;
+  const wrap = document.getElementById('chart-canvas-wrap');
+  wrap.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  canvas.width = 270;
+  canvas.height = 270;
+  wrap.appendChild(canvas);
+  let title = `Pass #${passIdx + 1} · ${fmtDate(pass.start.time)} · ${fmtTime(pass.start.time)} · max ${Math.round(pass.peak.elevation)}°`;
+  if (pass.closeApproaches.length > 0) {
+    title += ' · ' + pass.closeApproaches.map(ca => `${ca.planet} ${ca.minSep}°`).join(', ');
+  }
+  document.getElementById('chart-modal-title').textContent = title;
+  document.getElementById('chart-modal').style.display = 'flex';
+  drawSkyChart(canvas, pass);
+}
+
+function closeChartModal() {
+  document.getElementById('chart-modal').style.display = 'none';
+}
+
 function openTransitMap(passIndex, planetName) {
   const pass = currentPasses[passIndex];
   if (!pass || currentLat === null) return;
@@ -1055,16 +1112,18 @@ function closeTransitMap() {
   if (leafletMap) { leafletMap.remove(); leafletMap = null; }
 }
 
-// Close modal when clicking outside the panel
+// Close modals when clicking outside the panel
 document.getElementById('map-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('map-modal')) closeTransitMap();
+});
+document.getElementById('chart-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('chart-modal')) closeChartModal();
 });
 
 // ── MAIN ──────────────────────────────────────────────────────────────────
 async function run(lat, lon, locationName) {
   document.getElementById('results').style.display = 'block';
   document.getElementById('pass-tbody').innerHTML = '';
-  document.getElementById('charts-grid').innerHTML = '';
   document.getElementById('no-passes').style.display = 'none';
   document.getElementById('pass-table').style.display = '';
 
@@ -1109,7 +1168,6 @@ async function run(lat, lon, locationName) {
             `${planetCount} near a planet or Moon${filterNote}`);
 
   renderTable(displayPasses);
-  renderCharts(displayPasses);
 }
 
 // ── LOCATION SETUP ────────────────────────────────────────────────────────
