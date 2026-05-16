@@ -230,9 +230,8 @@
       <tr>
         <th>#</th>
         <th>Date</th>
-        <th>Appears</th>
+        <th>Time</th>
         <th>Peak</th>
-        <th>Disappears</th>
         <th>Duration</th>
         <th>Max Alt</th>
         <th>Direction</th>
@@ -273,7 +272,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26135.16618096  .00004382  00000+0  87007-4 0  9996","line2":"2 25544  51.6313 103.5621 0007452  60.7339 299.4393 15.49219006566637","epoch":"Fri, 15 May 2026 03:59:00 UTC","generated":"5/16/2026, 12:39:11 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26135.16618096  .00004382  00000+0  87007-4 0  9996","line2":"2 25544  51.6313 103.5621 0007452  60.7339 299.4393 15.49219006566637","epoch":"Fri, 15 May 2026 03:59:00 UTC","generated":"5/16/2026, 12:47:54 AM"}
 </script>
 
 <script>
@@ -542,9 +541,8 @@ function renderTable(passes) {
     tr.innerHTML = `
       <td>${i + 1}</td>
       <td>${fmtDate(pass.start.time)}</td>
-      <td>${fmtTime(pass.start.time)}</td>
+      <td>${fmtTime(pass.start.time)} – ${fmtTime(pass.end.time)}</td>
       <td>${fmtTime(pass.peak.time)}</td>
-      <td>${fmtTime(pass.end.time)}</td>
       <td>${dur}</td>
       <td class="${elevClass}">${Math.round(elev)}°</td>
       <td>${dir}</td>

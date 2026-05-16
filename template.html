@@ -230,9 +230,8 @@
       <tr>
         <th>#</th>
         <th>Date</th>
-        <th>Appears</th>
+        <th>Time</th>
         <th>Peak</th>
-        <th>Disappears</th>
         <th>Duration</th>
         <th>Max Alt</th>
         <th>Direction</th>
@@ -542,9 +541,8 @@ function renderTable(passes) {
     tr.innerHTML = `
       <td>${i + 1}</td>
       <td>${fmtDate(pass.start.time)}</td>
-      <td>${fmtTime(pass.start.time)}</td>
+      <td>${fmtTime(pass.start.time)} – ${fmtTime(pass.end.time)}</td>
       <td>${fmtTime(pass.peak.time)}</td>
-      <td>${fmtTime(pass.end.time)}</td>
       <td>${dur}</td>
       <td class="${elevClass}">${Math.round(elev)}°</td>
       <td>${dir}</td>
