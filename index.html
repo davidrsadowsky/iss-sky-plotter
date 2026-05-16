@@ -270,7 +270,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26135.16618096  .00004382  00000+0  87007-4 0  9996","line2":"2 25544  51.6313 103.5621 0007452  60.7339 299.4393 15.49219006566637","epoch":"Fri, 15 May 2026 03:59:00 UTC","generated":"5/16/2026, 6:29:20 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26135.16618096  .00004382  00000+0  87007-4 0  9996","line2":"2 25544  51.6313 103.5621 0007452  60.7339 299.4393 15.49219006566637","epoch":"Fri, 15 May 2026 03:59:00 UTC","generated":"5/16/2026, 6:30:21 AM"}
 </script>
 
 <script>
@@ -919,10 +919,16 @@ function openTransitMap(passIndex, planetName) {
   if (leafletMap) { leafletMap.remove(); leafletMap = null; }
   leafletMap = L.map('map-container', { worldCopyJump: true })
     .setView([currentLat, currentLon], 7);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 18,
-  }).addTo(leafletMap);
+    maxZoom: 19,
+  });
+  const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP and GIS User Community',
+    maxZoom: 19,
+  });
+  streetLayer.addTo(leafletMap);
+  L.control.layers({ 'Street': streetLayer, 'Satellite': satelliteLayer }, {}, { position: 'topright' }).addTo(leafletMap);
 
   // User location (blue)
   L.circleMarker([currentLat, currentLon], {

@@ -919,10 +919,16 @@ function openTransitMap(passIndex, planetName) {
   if (leafletMap) { leafletMap.remove(); leafletMap = null; }
   leafletMap = L.map('map-container', { worldCopyJump: true })
     .setView([currentLat, currentLon], 7);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 18,
-  }).addTo(leafletMap);
+    maxZoom: 19,
+  });
+  const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP and GIS User Community',
+    maxZoom: 19,
+  });
+  streetLayer.addTo(leafletMap);
+  L.control.layers({ 'Street': streetLayer, 'Satellite': satelliteLayer }, {}, { position: 'topright' }).addTo(leafletMap);
 
   // User location (blue)
   L.circleMarker([currentLat, currentLon], {
