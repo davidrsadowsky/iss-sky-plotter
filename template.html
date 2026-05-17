@@ -229,8 +229,7 @@
     <thead>
       <tr>
         <th>Date</th>
-        <th>Time</th>
-        <th>Direction</th>
+        <th>Time*</th>
         <th>Object</th>
         <th style="white-space:normal">ISS<br>Proximity</th>
         <th>Altitude*</th>
@@ -518,12 +517,14 @@ function addCloseApproaches(passes, lat, lon) {
             if (d < minDist) { minDist = d; nearestPt = p; }
           }
           ca.transitDistKm = minDist;
-          ca.issMagnitude = nearestPt ? computeMagnitude(nearestPt.satEci, nearestPt.time, lat, lon) : null;
+          ca.nearestTime   = nearestPt ? nearestPt.time : null;
+          ca.issMagnitude  = nearestPt ? computeMagnitude(nearestPt.satEci, nearestPt.time, lat, lon) : null;
         } else {
           ca.transitDistKm = null;
-          ca.issMagnitude = null;
+          ca.nearestTime   = null;
+          ca.issMagnitude  = null;
         }
-      } catch (_) { ca.transitDistKm = null; ca.issMagnitude = null; }
+      } catch (_) { ca.transitDistKm = null; ca.nearestTime = null; ca.issMagnitude = null; }
     }
   }
 }
@@ -556,12 +557,6 @@ function renderTable(passes) {
     const tr = document.createElement('tr');
     if (pass.closeApproaches.length > 0) tr.classList.add('planet-pass');
 
-    const elev = pass.peak.elevation;
-    const elevClass = elev >= 60 ? 'elev-high' : elev >= 30 ? 'elev-mid' : 'elev-low';
-    const dur = fmtDur(pass.end.time - pass.start.time);
-    const startComp = azToCompass(pass.start.azimuth);
-    const endComp   = azToCompass(pass.end.azimuth);
-    const dir = startComp === endComp ? startComp : `${startComp} → ${endComp}`;
 
     let objHtml  = '—', proxHtml = '—', altHtml = '—', magHtml = '—', issMagHtml = '—', distHtml = '—';
     let mapHtml  = '—';
@@ -579,8 +574,7 @@ function renderTable(passes) {
 
     tr.innerHTML = `
       <td>${fmtDate(pass.start.time)}</td>
-      <td>${fmtTime(pass.start.time)} – ${fmtTime(pass.end.time)}</td>
-      <td>${dir}</td>
+      <td>${pass.closeApproaches.length > 0 ? pass.closeApproaches.map(ca => ca.nearestTime ? fmtTime(ca.nearestTime) : '—').join('<br>') : '—'}</td>
       <td>${objHtml}</td>
       <td>${proxHtml}</td>
       <td>${altHtml}</td>
