@@ -228,7 +228,6 @@
   <table id="pass-table">
     <thead>
       <tr>
-        <th>#</th>
         <th>Date</th>
         <th>Time</th>
         <th>Direction</th>
@@ -274,7 +273,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26137.03684517  .00005133  00000+0  10043-3 0  9995","line2":"2 25544  51.6321  94.3035 0007556  67.0843 293.0943 15.49238964566924","epoch":"Sun, 17 May 2026 00:53:00 UTC","generated":"5/17/2026, 7:57:35 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26137.03684517  .00005133  00000+0  10043-3 0  9995","line2":"2 25544  51.6321  94.3035 0007556  67.0843 293.0943 15.49238964566924","epoch":"Sun, 17 May 2026 00:53:00 UTC","generated":"5/17/2026, 7:59:10 AM"}
 </script>
 
 <script>
@@ -579,7 +578,6 @@ function renderTable(passes) {
     }
 
     tr.innerHTML = `
-      <td>${i + 1}</td>
       <td>${fmtDate(pass.start.time)}</td>
       <td>${fmtTime(pass.start.time)} – ${fmtTime(pass.end.time)}</td>
       <td>${dir}</td>
