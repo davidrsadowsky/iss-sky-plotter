@@ -1126,7 +1126,15 @@ function openTransitMap(passIndex, planetName) {
       correctedLayers.push(corrLine, corrHit);
       elevStatus.innerHTML =
         `<span style="color:#00d4ff">✓ Elevation correction and path precision improvement applied — ${samples.length} samples via ${source}.</span>` +
-        (clickMag !== null ? `<br><span style="color:#c0c8f0">At this location and time (${fmtTime(clickDate)}): ISS magnitude ≈ ${clickMag >= 0 ? '+' : ''}${clickMag}</span>` : '');
+        (() => {
+          const h  = clickDate.getHours().toString().padStart(2,'0');
+          const mi = clickDate.getMinutes().toString().padStart(2,'0');
+          const s  = clickDate.getSeconds().toString().padStart(2,'0');
+          const cs = Math.floor((clickTime % 1000) / 10).toString().padStart(2,'0');
+          const timeStr = `${h}:${mi}:${s}.${cs}`;
+          const magPart = clickMag !== null ? ` · magnitude ≈ ${clickMag >= 0 ? '+' : ''}${clickMag}` : '';
+          return `<br><span style="color:#c0c8f0">At this location: ISS transit at ${timeStr}${magPart}</span>`;
+        })();
       if (legendDiv) legendDiv.innerHTML =
         '<div><span style="display:inline-block;width:22px;height:3px;background:#ffc830;margin-right:7px;vertical-align:middle"></span>Sea level</div>' +
         `<div><span style="display:inline-block;width:22px;height:3px;background:#00d4ff;margin-right:7px;vertical-align:middle"></span>Terrain corrected (${source})</div>`;
@@ -1170,7 +1178,7 @@ function openTransitMap(passIndex, planetName) {
     `<strong>Nearest transit point:</strong> ${distStr} from your location &nbsp;·&nbsp; ` +
     `<strong>Be there at:</strong> ${fmtTime(closest.time)} local` +
     `<br><span style="color:#40507a;font-size:0.82em">⚠ Accuracy limited by TLE precision. Refresh ISS data on the day of the event for best results.</span>` +
-    `<br><span style="color:#506080;font-size:0.82em">Click the gold line to apply elevation correction, improve path precision, and see estimated ISS magnitude at that point. Zoom in for higher accuracy.</span>`;
+    `<br><span style="color:#506080;font-size:0.82em">Click the gold line to apply elevation correction, improve path precision, and see estimated ISS transit time and magnitude at that point. Zoom in for higher accuracy.</span>`;
   document.getElementById('map-elev-status').textContent = '';
 }
 
