@@ -270,7 +270,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26135.16618096  .00004382  00000+0  87007-4 0  9996","line2":"2 25544  51.6313 103.5621 0007452  60.7339 299.4393 15.49219006566637","epoch":"Fri, 15 May 2026 03:59:00 UTC","generated":"5/16/2026, 7:06:29 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26137.03684517  .00005133  00000+0  10043-3 0  9995","line2":"2 25544  51.6321  94.3035 0007556  67.0843 293.0943 15.49238964566924","epoch":"Sun, 17 May 2026 00:53:00 UTC","generated":"5/17/2026, 5:57:28 AM"}
 </script>
 
 <script>
@@ -1115,7 +1115,7 @@ function openTransitMap(passIndex, planetName) {
   document.getElementById('map-info').innerHTML =
     `<strong>Nearest transit point:</strong> ${distStr} from your location &nbsp;·&nbsp; ` +
     `<strong>Be there at:</strong> ${fmtTime(closest.time)} local` +
-    `<br><span style="color:#40507a;font-size:0.82em">⚠ Accuracy limited by TLE precision (~100–500 m). Refresh ISS data on the day of the event for best results.</span>` +
+    `<br><span style="color:#40507a;font-size:0.82em">⚠ Accuracy limited by TLE precision. Refresh ISS data on the day of the event for best results.</span>` +
     `<br><span style="color:#506080;font-size:0.82em">Click the gold line to apply elevation correction and improve path precision for the current view. Zoom in for higher accuracy.</span>`;
   document.getElementById('map-elev-status').textContent = '';
 }

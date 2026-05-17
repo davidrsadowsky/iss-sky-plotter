@@ -1115,7 +1115,7 @@ function openTransitMap(passIndex, planetName) {
   document.getElementById('map-info').innerHTML =
     `<strong>Nearest transit point:</strong> ${distStr} from your location &nbsp;·&nbsp; ` +
     `<strong>Be there at:</strong> ${fmtTime(closest.time)} local` +
-    `<br><span style="color:#40507a;font-size:0.82em">⚠ Accuracy limited by TLE precision (~100–500 m). Refresh ISS data on the day of the event for best results.</span>` +
+    `<br><span style="color:#40507a;font-size:0.82em">⚠ Accuracy limited by TLE precision. Refresh ISS data on the day of the event for best results.</span>` +
     `<br><span style="color:#506080;font-size:0.82em">Click the gold line to apply elevation correction and improve path precision for the current view. Zoom in for higher accuracy.</span>`;
   document.getElementById('map-elev-status').textContent = '';
 }
