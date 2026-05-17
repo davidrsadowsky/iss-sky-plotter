@@ -158,7 +158,7 @@
       body { padding: 12px 10px; }
       h1 { font-size: 1.3em; }
       .table-scroll-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      #pass-table { font-size: 0.78em; min-width: 680px; }
+      #pass-table { font-size: 0.78em; min-width: 820px; }
       #pass-table thead th, #pass-table tbody td { padding: 5px 7px; }
       .btn-transit { display: block; margin: 4px 0 0 0; font-size: 0.8em; }
       #settings-bar { gap: 10px; padding: 10px 12px; }
@@ -231,9 +231,12 @@
         <th>#</th>
         <th>Date</th>
         <th>Time</th>
-        <th>Peak</th>
         <th>Direction</th>
-        <th>Object / Altitude / Distance</th>
+        <th>Object</th>
+        <th>ISS Proximity</th>
+        <th>Altitude</th>
+        <th>Magnitude</th>
+        <th>Distance</th>
         <th>Map</th>
         <th>Sky Chart</th>
       </tr>
@@ -270,7 +273,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26137.03684517  .00005133  00000+0  10043-3 0  9995","line2":"2 25544  51.6321  94.3035 0007556  67.0843 293.0943 15.49238964566924","epoch":"Sun, 17 May 2026 00:53:00 UTC","generated":"5/17/2026, 7:38:58 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26137.03684517  .00005133  00000+0  10043-3 0  9995","line2":"2 25544  51.6321  94.3035 0007556  67.0843 293.0943 15.49238964566924","epoch":"Sun, 17 May 2026 00:53:00 UTC","generated":"5/17/2026, 7:46:09 AM"}
 </script>
 
 <script>
@@ -482,18 +485,24 @@ function addCloseApproaches(passes, lat, lon) {
       const look = satellite.ecfToLookAngles(obsGd, posEcf);
       const elev = look.elevation / DEG;
       if (elev < 0) continue;
-      finePoints.push({ elevation: elev, azimuth: (look.azimuth / DEG + 360) % 360 });
+      finePoints.push({ elevation: elev, azimuth: (look.azimuth / DEG + 360) % 360, date });
     }
 
     for (const [name, ppos] of Object.entries(planets)) {
       if (ppos.altitude < 0) continue;
-      let minSep = Infinity, transitElev = 0;
+      let minSep = Infinity, transitElev = 0, minSepDate = null;
       for (const pt of finePoints) {
         const sep = angSepDeg(pt.azimuth, pt.elevation, ppos.azimuth, ppos.altitude);
-        if (sep < minSep) { minSep = sep; transitElev = pt.elevation; }
+        if (sep < minSep) { minSep = sep; transitElev = pt.elevation; minSepDate = pt.date; }
       }
       if (minSep <= getCloseDeg()) {
-        pass.closeApproaches.push({ planet: name, minSep: Math.round(minSep * 10) / 10, transitElev: Math.round(transitElev) });
+        let planetMag = null;
+        if (name !== 'Moon' && minSepDate) {
+          try {
+            planetMag = Math.round(Astronomy.Illumination(Astronomy.Body[name], Astronomy.MakeTime(minSepDate)).mag * 10) / 10;
+          } catch (_) {}
+        }
+        pass.closeApproaches.push({ planet: name, minSep: Math.round(minSep * 10) / 10, transitElev: Math.round(transitElev), planetMag });
       }
     }
     pass.closeApproaches.sort((a, b) => a.minSep - b.minSep);
@@ -552,15 +561,15 @@ function renderTable(passes) {
     const endComp   = azToCompass(pass.end.azimuth);
     const dir = startComp === endComp ? startComp : `${startComp} → ${endComp}`;
 
-    let nearHtml = '—';
+    let objHtml  = '—', proxHtml = '—', altHtml = '—', magHtml = '—', distHtml = '—';
     let mapHtml  = '—';
     if (pass.closeApproaches.length > 0) {
-      nearHtml = pass.closeApproaches.map(ca => {
-        const pColor = PLANET_COLORS[ca.planet] || '#ffc830';
-        return `<span style="color:${pColor};font-weight:600">${ca.planet}</span>` +
-               ` · ${ca.minSep}° · ${ca.transitElev}° alt · nearest ${fmtTransitDist(ca.transitDistKm)}`;
-      }).join('<br>');
-      mapHtml = pass.closeApproaches.map(ca =>
+      objHtml  = pass.closeApproaches.map(ca => { const c = PLANET_COLORS[ca.planet] || '#ffc830'; return `<span style="color:${c};font-weight:600">${ca.planet}</span>`; }).join('<br>');
+      proxHtml = pass.closeApproaches.map(ca => `${ca.minSep}°`).join('<br>');
+      altHtml  = pass.closeApproaches.map(ca => `${ca.transitElev}°`).join('<br>');
+      magHtml  = pass.closeApproaches.map(ca => ca.planet === 'Moon' ? 'N/A' : (ca.planetMag !== null ? `${ca.planetMag >= 0 ? '+' : ''}${ca.planetMag}` : 'N/A')).join('<br>');
+      distHtml = pass.closeApproaches.map(ca => fmtTransitDist(ca.transitDistKm)).join('<br>');
+      mapHtml  = pass.closeApproaches.map(ca =>
         `<button class="btn-transit" onclick="openTransitMap(${pass.idx},'${ca.planet}')">Map</button>`
       ).join(' ');
     }
@@ -569,9 +578,12 @@ function renderTable(passes) {
       <td>${i + 1}</td>
       <td>${fmtDate(pass.start.time)}</td>
       <td>${fmtTime(pass.start.time)} – ${fmtTime(pass.end.time)}</td>
-      <td>${fmtTime(pass.peak.time)}</td>
       <td>${dir}</td>
-      <td>${nearHtml}</td>
+      <td>${objHtml}</td>
+      <td>${proxHtml}</td>
+      <td>${altHtml}</td>
+      <td>${magHtml}</td>
+      <td>${distHtml}</td>
       <td>${mapHtml}</td>
       <td><button class="btn-chart" onclick="openChartModal(${pass.idx})">Chart</button></td>
     `;
