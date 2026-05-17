@@ -64,7 +64,7 @@
       min-height: 20px; margin-bottom: 12px;
     }
     #results { display: none; }
-    #loc-display { color: #5060a0; font-size: 0.82em; margin-bottom: 14px; }
+    #loc-display { color: #5060a0; font-size: 0.82em; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
     /* Table */
     table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
     thead th {
@@ -233,10 +233,10 @@
         <th>Direction</th>
         <th>Object</th>
         <th style="white-space:normal">ISS<br>Proximity</th>
-        <th>Altitude</th>
+        <th>Altitude*</th>
         <th style="white-space:normal">Planet<br>Magnitude</th>
-        <th style="white-space:normal">ISS<br>Magnitude<br>(nearest)</th>
-        <th style="white-space:normal">Distance<br>(nearest)</th>
+        <th style="white-space:normal">ISS<br>Magnitude*</th>
+        <th>Distance*</th>
         <th>Map</th>
         <th>Sky Chart</th>
       </tr>
@@ -273,7 +273,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26137.03684517  .00005133  00000+0  10043-3 0  9995","line2":"2 25544  51.6321  94.3035 0007556  67.0843 293.0943 15.49238964566924","epoch":"Sun, 17 May 2026 00:53:00 UTC","generated":"5/17/2026, 7:59:10 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26137.03684517  .00005133  00000+0  10043-3 0  9995","line2":"2 25544  51.6321  94.3035 0007556  67.0843 293.0943 15.49238964566924","epoch":"Sun, 17 May 2026 00:53:00 UTC","generated":"5/17/2026, 8:03:42 AM"}
 </script>
 
 <script>
@@ -1202,8 +1202,9 @@ async function run(lat, lon, locationName) {
 
   const coordStr = `${lat >= 0 ? lat.toFixed(3) + '°N' : Math.abs(lat).toFixed(3) + '°S'}, ` +
                    `${lon >= 0 ? lon.toFixed(3) + '°E' : Math.abs(lon).toFixed(3) + '°W'}`;
-  document.getElementById('loc-display').textContent =
-    `Location: ${locationName ? locationName + ' · ' : ''}${coordStr} · Next ${getDaysAhead()} days`;
+  document.getElementById('loc-display').innerHTML =
+    `<span>Location: ${locationName ? locationName + ' · ' : ''}${coordStr} · Next ${getDaysAhead()} days</span>` +
+    `<span style="color:#3a4070;font-size:0.95em">* calculated at nearest transit path point to user's location</span>`;
 
   if (!TLE || !TLE.line1) {
     setStatus('ISS data not loaded — click ↻ Refresh ISS Data and try again.');
