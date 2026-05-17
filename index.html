@@ -273,7 +273,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26137.03684517  .00005133  00000+0  10043-3 0  9995","line2":"2 25544  51.6321  94.3035 0007556  67.0843 293.0943 15.49238964566924","epoch":"Sun, 17 May 2026 00:53:00 UTC","generated":"5/17/2026, 8:03:42 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26137.03684517  .00005133  00000+0  10043-3 0  9995","line2":"2 25544  51.6321  94.3035 0007556  67.0843 293.0943 15.49238964566924","epoch":"Sun, 17 May 2026 00:53:00 UTC","generated":"5/17/2026, 8:05:36 AM"}
 </script>
 
 <script>
@@ -1204,7 +1204,7 @@ async function run(lat, lon, locationName) {
                    `${lon >= 0 ? lon.toFixed(3) + '°E' : Math.abs(lon).toFixed(3) + '°W'}`;
   document.getElementById('loc-display').innerHTML =
     `<span>Location: ${locationName ? locationName + ' · ' : ''}${coordStr} · Next ${getDaysAhead()} days</span>` +
-    `<span style="color:#3a4070;font-size:0.95em">* calculated at nearest transit path point to user's location</span>`;
+    `<span>* calculated at nearest transit path point to user's location</span>`;
 
   if (!TLE || !TLE.line1) {
     setStatus('ISS data not loaded — click ↻ Refresh ISS Data and try again.');

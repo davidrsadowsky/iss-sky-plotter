@@ -1204,7 +1204,7 @@ async function run(lat, lon, locationName) {
                    `${lon >= 0 ? lon.toFixed(3) + '°E' : Math.abs(lon).toFixed(3) + '°W'}`;
   document.getElementById('loc-display').innerHTML =
     `<span>Location: ${locationName ? locationName + ' · ' : ''}${coordStr} · Next ${getDaysAhead()} days</span>` +
-    `<span style="color:#3a4070;font-size:0.95em">* calculated at nearest transit path point to user's location</span>`;
+    `<span>* calculated at nearest transit path point to user's location</span>`;
 
   if (!TLE || !TLE.line1) {
     setStatus('ISS data not loaded — click ↻ Refresh ISS Data and try again.');
