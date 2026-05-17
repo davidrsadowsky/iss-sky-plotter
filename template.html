@@ -233,9 +233,10 @@
         <th>Time</th>
         <th>Direction</th>
         <th>Object</th>
-        <th>ISS Proximity</th>
+        <th style="white-space:normal">ISS<br>Proximity</th>
         <th>Altitude</th>
-        <th>Magnitude</th>
+        <th style="white-space:normal">Planet<br>Magnitude</th>
+        <th style="white-space:normal">ISS<br>Magnitude<br>(nearest)</th>
         <th>Distance</th>
         <th>Map</th>
         <th>Sky Chart</th>
@@ -507,21 +508,23 @@ function addCloseApproaches(passes, lat, lon) {
     }
     pass.closeApproaches.sort((a, b) => a.minSep - b.minSep);
 
-    // Compute nearest transit distance for each close approach (full pass scan).
+    // Compute nearest transit distance and ISS magnitude at nearest point.
     for (const ca of pass.closeApproaches) {
       try {
         const path = computeTransitPath(pass, ca.planet);
         if (path.length > 0) {
-          let minDist = Infinity;
+          let minDist = Infinity, nearestPt = null;
           for (const p of path) {
             const d = haversineKm(lat, lon, p.lat, p.lon);
-            if (d < minDist) minDist = d;
+            if (d < minDist) { minDist = d; nearestPt = p; }
           }
           ca.transitDistKm = minDist;
+          ca.issMagnitude = nearestPt ? computeMagnitude(nearestPt.satEci, nearestPt.time, lat, lon) : null;
         } else {
           ca.transitDistKm = null;
+          ca.issMagnitude = null;
         }
-      } catch (_) { ca.transitDistKm = null; }
+      } catch (_) { ca.transitDistKm = null; ca.issMagnitude = null; }
     }
   }
 }
@@ -561,17 +564,18 @@ function renderTable(passes) {
     const endComp   = azToCompass(pass.end.azimuth);
     const dir = startComp === endComp ? startComp : `${startComp} → ${endComp}`;
 
-    let objHtml  = '—', proxHtml = '—', altHtml = '—', magHtml = '—', distHtml = '—';
+    let objHtml  = '—', proxHtml = '—', altHtml = '—', magHtml = '—', issMagHtml = '—', distHtml = '—';
     let mapHtml  = '—';
     if (pass.closeApproaches.length > 0) {
       objHtml  = pass.closeApproaches.map(ca => { const c = PLANET_COLORS[ca.planet] || '#ffc830'; return `<span style="color:${c};font-weight:600">${ca.planet}</span>`; }).join('<br>');
       proxHtml = pass.closeApproaches.map(ca => `${ca.minSep}°`).join('<br>');
       altHtml  = pass.closeApproaches.map(ca => `${ca.transitElev}°`).join('<br>');
       magHtml  = pass.closeApproaches.map(ca => ca.planet === 'Moon' ? 'N/A' : (ca.planetMag !== null ? `${ca.planetMag >= 0 ? '+' : ''}${ca.planetMag}` : 'N/A')).join('<br>');
+      issMagHtml = pass.closeApproaches.map(ca => ca.issMagnitude !== null && ca.issMagnitude !== undefined ? `${ca.issMagnitude >= 0 ? '+' : ''}${ca.issMagnitude}` : 'N/A').join('<br>');
       distHtml = pass.closeApproaches.map(ca => fmtTransitDist(ca.transitDistKm)).join('<br>');
       mapHtml  = pass.closeApproaches.map(ca =>
         `<button class="btn-transit" onclick="openTransitMap(${pass.idx},'${ca.planet}')">Map</button>`
-      ).join(' ');
+      ).join('<br>');
     }
 
     tr.innerHTML = `
@@ -583,6 +587,7 @@ function renderTable(passes) {
       <td>${proxHtml}</td>
       <td>${altHtml}</td>
       <td>${magHtml}</td>
+      <td>${issMagHtml}</td>
       <td>${distHtml}</td>
       <td>${mapHtml}</td>
       <td><button class="btn-chart" onclick="openChartModal(${pass.idx})">Chart</button></td>
