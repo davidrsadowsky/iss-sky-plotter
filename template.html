@@ -233,6 +233,7 @@
         <th>Object</th>
         <th style="white-space:normal">ISS<br>Proximity</th>
         <th>Altitude*</th>
+        <th>Azimuth*</th>
         <th style="white-space:normal">Planet<br>Magnitude</th>
         <th style="white-space:normal">ISS<br>Magnitude*</th>
         <th>Distance*</th>
@@ -516,15 +517,22 @@ function addCloseApproaches(passes, lat, lon) {
             const d = haversineKm(lat, lon, p.lat, p.lon);
             if (d < minDist) { minDist = d; nearestPt = p; }
           }
-          ca.transitDistKm = minDist;
-          ca.nearestTime   = nearestPt ? nearestPt.time : null;
-          ca.issMagnitude  = nearestPt ? computeMagnitude(nearestPt.satEci, nearestPt.time, lat, lon) : null;
+          ca.transitDistKm  = minDist;
+          ca.nearestTime    = nearestPt ? nearestPt.time : null;
+          ca.issMagnitude   = nearestPt ? computeMagnitude(nearestPt.satEci, nearestPt.time, lat, lon) : null;
+          if (nearestPt) {
+            const npGmst = satellite.gstime(nearestPt.time);
+            const npEcf  = satellite.eciToEcf(nearestPt.satEci, npGmst);
+            const npLook = satellite.ecfToLookAngles(obsGd, npEcf);
+            ca.nearestAzimuth = Math.round((npLook.azimuth / DEG + 360) % 360);
+          } else { ca.nearestAzimuth = null; }
         } else {
-          ca.transitDistKm = null;
-          ca.nearestTime   = null;
-          ca.issMagnitude  = null;
+          ca.transitDistKm  = null;
+          ca.nearestTime    = null;
+          ca.issMagnitude   = null;
+          ca.nearestAzimuth = null;
         }
-      } catch (_) { ca.transitDistKm = null; ca.nearestTime = null; ca.issMagnitude = null; }
+      } catch (_) { ca.transitDistKm = null; ca.nearestTime = null; ca.issMagnitude = null; ca.nearestAzimuth = null; }
     }
   }
 }
@@ -578,6 +586,7 @@ function renderTable(passes) {
       <td>${objHtml}</td>
       <td>${proxHtml}</td>
       <td>${altHtml}</td>
+      <td>${pass.closeApproaches.length > 0 ? pass.closeApproaches.map(ca => ca.nearestAzimuth !== null ? ca.nearestAzimuth + '°' : '—').join('<br>') : '—'}</td>
       <td>${magHtml}</td>
       <td>${issMagHtml}</td>
       <td>${distHtml}</td>
