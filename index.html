@@ -273,7 +273,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26172.76913116  .00009060  00000+0  17028-3 0  9997","line2":"2 25544  51.6326 277.4139 0004499 214.6152 145.4544 15.49357580572463","epoch":"Sun, 21 Jun 2026 18:27:00 UTC","generated":"6/21/2026, 9:15:45 PM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26172.76913116  .00009060  00000+0  17028-3 0  9997","line2":"2 25544  51.6326 277.4139 0004499 214.6152 145.4544 15.49357580572463","epoch":"Sun, 21 Jun 2026 18:27:00 UTC","generated":"6/21/2026, 9:22:20 PM"}
 </script>
 
 <script>
@@ -305,6 +305,8 @@ const PLANET_COLORS = {
 };
 const DEG = Math.PI / 180;
 const R_EARTH_KM = 6371;
+const WGS84_A = 6378.137;     // equatorial radius (km)
+const WGS84_B = 6356.752314;  // polar radius (km)
 const AU_KM = 149597870.7;
 
 // ── TLE ─────────────────────────────────────────────────────────────────
@@ -861,45 +863,44 @@ async function refreshTLE() {
 
 // ── TRANSIT PATH ──────────────────────────────────────────────────────────
 
+// Find transit point on WGS84 ellipsoid: x²/a² + y²/a² + z²/b² = 1
+// Line: P = S + λ·d → Aλ² + 2Bλ + C = 0
 function findTransitPoint(satEci, bodyEci) {
-  // Find the point O on Earth's surface where O, ISS, and body are collinear.
-  // Direction from body through ISS toward observer:
   const dx = satEci.x - bodyEci.x, dy = satEci.y - bodyEci.y, dz = satEci.z - bodyEci.z;
   const dLen = Math.sqrt(dx*dx + dy*dy + dz*dz);
   if (dLen === 0) return null;
-  const dHat = { x: dx/dLen, y: dy/dLen, z: dz/dLen };
-
-  // O = P_sat + λ·D̂,  |O|² = R_earth²
-  // → λ² + 2(P_sat·D̂)λ + (|P_sat|²−R_earth²) = 0
-  const a = satEci.x*dHat.x + satEci.y*dHat.y + satEci.z*dHat.z;
-  const c = satEci.x**2 + satEci.y**2 + satEci.z**2 - R_EARTH_KM**2;
-  const disc = a*a - c;
+  const d = { x: dx/dLen, y: dy/dLen, z: dz/dLen };
+  const a2 = WGS84_A * WGS84_A, b2 = WGS84_B * WGS84_B;
+  const A = (d.x*d.x + d.y*d.y) / a2 + d.z*d.z / b2;
+  const B = (satEci.x*d.x + satEci.y*d.y) / a2 + satEci.z*d.z / b2;
+  const C = (satEci.x*satEci.x + satEci.y*satEci.y) / a2 + satEci.z*satEci.z / b2 - 1;
+  const disc = B*B - A*C;
   if (disc < 0) return null;
-
   const sqrtDisc = Math.sqrt(disc);
-  // Smaller positive root = near-Earth intersection (observer side)
-  const lam1 = -a - sqrtDisc, lam2 = -a + sqrtDisc;
+  const lam1 = (-B - sqrtDisc) / A, lam2 = (-B + sqrtDisc) / A;
   const lam = lam1 > 0 ? lam1 : lam2 > 0 ? lam2 : null;
   if (lam === null) return null;
-
-  return { x: satEci.x + lam*dHat.x, y: satEci.y + lam*dHat.y, z: satEci.z + lam*dHat.z };
+  return { x: satEci.x + lam*d.x, y: satEci.y + lam*d.y, z: satEci.z + lam*d.z };
 }
 
+// Same as above but on an elevated ellipsoid (a+h, a+h, b+h)
 function findTransitPointAtElevation(satEci, bodyEci, elevKm) {
-  const R = R_EARTH_KM + elevKm;
   const dx = satEci.x - bodyEci.x, dy = satEci.y - bodyEci.y, dz = satEci.z - bodyEci.z;
   const dLen = Math.sqrt(dx*dx + dy*dy + dz*dz);
   if (dLen === 0) return null;
-  const dHat = { x: dx/dLen, y: dy/dLen, z: dz/dLen };
-  const a = satEci.x*dHat.x + satEci.y*dHat.y + satEci.z*dHat.z;
-  const c = satEci.x**2 + satEci.y**2 + satEci.z**2 - R**2;
-  const disc = a*a - c;
+  const d = { x: dx/dLen, y: dy/dLen, z: dz/dLen };
+  const ae = WGS84_A + elevKm, be = WGS84_B + elevKm;
+  const a2 = ae * ae, b2 = be * be;
+  const A = (d.x*d.x + d.y*d.y) / a2 + d.z*d.z / b2;
+  const B = (satEci.x*d.x + satEci.y*d.y) / a2 + satEci.z*d.z / b2;
+  const C = (satEci.x*satEci.x + satEci.y*satEci.y) / a2 + satEci.z*satEci.z / b2 - 1;
+  const disc = B*B - A*C;
   if (disc < 0) return null;
   const sqrtDisc = Math.sqrt(disc);
-  const lam1 = -a - sqrtDisc, lam2 = -a + sqrtDisc;
+  const lam1 = (-B - sqrtDisc) / A, lam2 = (-B + sqrtDisc) / A;
   const lam = lam1 > 0 ? lam1 : lam2 > 0 ? lam2 : null;
   if (lam === null) return null;
-  return { x: satEci.x + lam*dHat.x, y: satEci.y + lam*dHat.y, z: satEci.z + lam*dHat.z };
+  return { x: satEci.x + lam*d.x, y: satEci.y + lam*d.y, z: satEci.z + lam*d.z };
 }
 
 function haversineKm(lat1, lon1, lat2, lon2) {
