@@ -7,6 +7,7 @@
   <title>ISS Planet Transit Tool</title>
   <script src="https://cdn.jsdelivr.net/npm/satellite.js@5/dist/satellite.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2/astronomy.browser.min.js"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCzBfzymO3sYdpa2cUT5py0wZJ-R2pRip4&libraries=elevation"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -281,7 +282,6 @@ TLE_DATA_PLACEHOLDER
 
 // ── CONFIG ──────────────────────────────────────────────────────────────
 const SUN_MAX_ALT   = -6;         // degrees — sun must be below this (civil twilight)
-const GOOGLE_ELEVATION_API_KEY = 'AIzaSyCzBfzymO3sYdpa2cUT5py0wZJ-R2pRip4';
 const STEP_MS       = 15 * 1000;  // 15-second scan steps
 
 function getCloseDeg()  { return parseFloat(document.getElementById('sel-threshold').value); }
@@ -740,17 +740,17 @@ function renderCharts(passes) {
 }
 
 // ── ELEVATION API ────────────────────────────────────────────────────────
-// Primary: Google Elevation via corsproxy.io (512 locations, high accuracy).
+// Primary: Google Maps JS API ElevationService (512 locations, high accuracy).
 // Fallback: Open-Topo-Data (100 locations, CORS-native, no key needed).
 
 async function fetchElevationsGoogle(locations) {
-  const locStr = locations.map(l => `${l.lat.toFixed(6)},${l.lon.toFixed(6)}`).join('|');
-  const googleUrl = `https://maps.googleapis.com/maps/api/elevation/json?locations=${encodeURIComponent(locStr)}&key=${GOOGLE_ELEVATION_API_KEY}`;
-  const resp = await fetch(`https://corsproxy.io/?${encodeURIComponent(googleUrl)}`);
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const data = await resp.json();
-  if (data.status !== 'OK') throw new Error(`Google: ${data.status}`);
-  return data.results.map(r => r.elevation);
+  const elevator = new google.maps.ElevationService();
+  const latlngs = locations.map(l => ({ lat: l.lat, lng: l.lon }));
+  const result = await elevator.getElevationForLocations({ locations: latlngs });
+  if (result.results && result.results.length > 0) {
+    return result.results.map(r => r.elevation);
+  }
+  throw new Error('Google: no results');
 }
 
 async function fetchElevationsOpenTopo(locations) {
@@ -796,10 +796,9 @@ async function initTLE() {
   document.getElementById('btn-refresh-tle').disabled = true;
   document.getElementById('tle-subtitle').textContent = 'Fetching latest ISS data…';
 
-  // 1. Try CelesTrak via CORS proxy (most accurate, most widely used source)
+  // 1. Try CelesTrak directly (most accurate, most widely used source)
   try {
-    const ctUrl = 'https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE';
-    const resp = await fetch(`https://corsproxy.io/?${encodeURIComponent(ctUrl)}`, { cache: 'no-store' });
+    const resp = await fetch('https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE', { cache: 'no-store' });
     if (resp.ok) {
       const parsed = parseTLEText(await resp.text(), 'CelesTrak (live)');
       if (parsed) {
