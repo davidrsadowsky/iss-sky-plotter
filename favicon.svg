@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Saturn body -->
+  <circle cx="32" cy="32" r="14" fill="#e8cc70"/>
+  <!-- Saturn ring -->
+  <ellipse cx="32" cy="32" rx="24" ry="7" fill="none" stroke="#e8cc70" stroke-width="4" transform="rotate(-20 32 32)"/>
+  <!-- ISS silhouette (centered on planet) -->
+  <!-- Main truss -->
+  <rect x="14" y="30" width="36" height="2.5" rx="1" fill="#c0c8f0"/>
+  <!-- Solar panels (4 pairs) -->
+  <rect x="15" y="23" width="6" height="7" rx="0.5" fill="#7080e0"/>
+  <rect x="15" y="32.5" width="6" height="7" rx="0.5" fill="#7080e0"/>
+  <rect x="24" y="23" width="6" height="7" rx="0.5" fill="#7080e0"/>
+  <rect x="24" y="32.5" width="6" height="7" rx="0.5" fill="#7080e0"/>
+  <rect x="34" y="23" width="6" height="7" rx="0.5" fill="#7080e0"/>
+  <rect x="34" y="32.5" width="6" height="7" rx="0.5" fill="#7080e0"/>
+  <rect x="43" y="23" width="6" height="7" rx="0.5" fill="#7080e0"/>
+  <rect x="43" y="32.5" width="6" height="7" rx="0.5" fill="#7080e0"/>
+  <!-- Modules (center body) -->
+  <rect x="26" y="28" width="12" height="6" rx="1.5" fill="#a0a8d0"/>
+</svg>

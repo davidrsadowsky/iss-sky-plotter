@@ -5,6 +5,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ISS Planet Transit Tool</title>
+  <meta name="description" content="Predict ISS planet transits near you. Calculate exact times and locations, including elevation-corrected maps.">
+  <meta property="og:title" content="ISS Planet Transit Tool">
+  <meta property="og:description" content="Predict ISS planet transits near you. Calculate exact times and locations, including elevation-corrected maps.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://issplanet.com">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4NCT8EL4KH"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-4NCT8EL4KH');
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/satellite.js@5/dist/satellite.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2/astronomy.browser.min.js"></script>
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCzBfzymO3sYdpa2cUT5py0wZJ-R2pRip4&libraries=elevation"></script>
@@ -274,7 +288,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26177.67101756  .00008101  00000+0  15268-3 0  9990","line2":"2 25544  51.6322 253.1475 0004299 235.1263 124.9322 15.49442433573225","epoch":"Fri, 26 Jun 2026 16:06:00 UTC","generated":"6/27/2026, 3:41:04 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26178.18698937  .00007470  00000+0  14139-3 0  9993","line2":"2 25544  51.6321 250.5931 0004286 237.0870 122.9706 15.49451091573306","epoch":"Sat, 27 Jun 2026 04:29:00 UTC","generated":"6/27/2026, 6:33:59 AM"}
 </script>
 
 <script>
@@ -969,6 +983,7 @@ function closeChartModal() {
 }
 
 function openTransitMap(passIndex, planetName) {
+  gtag('event', 'open_transit_map', { planet: planetName });
   const pass = currentPasses[passIndex];
   if (!pass || currentLat === null) return;
 
@@ -1031,6 +1046,7 @@ function openTransitMap(passIndex, planetName) {
 
   // Elevation correction — triggered by clicking the sea-level path line
   async function applyElevationCorrection(clickedLatLng) {
+    gtag('event', 'apply_elevation_correction');
     correctedLayers.forEach(l => leafletMap.removeLayer(l));
     correctedLayers.length = 0;
 
@@ -1330,5 +1346,8 @@ document.getElementById('sel-show').addEventListener('change', onSettingChange);
 // Auto-fetch TLE on every page load
 initTLE();
 </script>
+<footer style="text-align:center;padding:24px 0 12px;font-size:0.78em;color:#3a4070">
+  <a href="privacy.html" style="color:#4050a0">Privacy Policy</a> · <a href="disclaimer.html" style="color:#4050a0">Disclaimer</a> · <a href="mailto:admin@issplanet.com" style="color:#4050a0">Contact</a>
+</footer>
 </body>
 </html>
