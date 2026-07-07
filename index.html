@@ -242,13 +242,6 @@
       <option value="100">100</option>
     </select>
   </span>
-  <span>
-    <label for="sel-show">Show:</label>
-    <select id="sel-show">
-      <option value="all">All passes</option>
-      <option value="planet" selected>Planet/Moon passes only</option>
-    </select>
-  </span>
 </div>
 
 <div id="generate-bar">
@@ -308,7 +301,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26187.47606523  .00006115  00000+0  11937-3 0  9993","line2":"2 25544  51.6304 204.6205 0006688 262.9565  97.0662 15.48920216574748","epoch":"Mon, 06 Jul 2026 11:25:00 UTC","generated":"7/7/2026, 12:29:02 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26187.47606523  .00006115  00000+0  11937-3 0  9993","line2":"2 25544  51.6304 204.6205 0006688 262.9565  97.0662 15.48920216574748","epoch":"Mon, 06 Jul 2026 11:25:00 UTC","generated":"7/7/2026, 12:34:16 AM"}
 </script>
 
 <script>
@@ -321,7 +314,6 @@ const STEP_MS       = 15 * 1000;  // 15-second scan steps
 function getCloseDeg()  { return parseFloat(document.getElementById('sel-threshold').value); }
 function getDaysAhead() { return Math.min(60, Math.max(1, parseInt(document.getElementById('inp-days').value) || 30)); }
 function getUnits()     { return document.getElementById('sel-units').value; }
-function getShowMode()  { return document.getElementById('sel-show').value; }
 function getMinAlt()    { return parseFloat(document.getElementById('sel-min-alt').value) || 0; }
 function getMaxDistKm() {
   const v = document.getElementById('sel-max-dist').value;
@@ -1307,14 +1299,10 @@ async function run(lat, lon, locationName) {
     });
   });
 
-  const displayPasses = getShowMode() === 'planet'
-    ? passes.filter(p => p.closeApproaches.length > 0)
-    : passes.filter(p => p.peak.elevation >= minAlt);
+  const displayPasses = passes.filter(p => p.closeApproaches.length > 0);
 
-  const filterNote = getShowMode() === 'planet' && displayPasses.length < planetCountRaw
-    ? ` (filtered to ${displayPasses.length} with planet/Moon passes)` : '';
   setStatus(`Found ${passes.length} visible pass${passes.length !== 1 ? 'es' : ''} · ` +
-            `${planetCountRaw} near a planet or Moon${filterNote}`);
+            `${planetCountRaw} near a planet or Moon · showing ${displayPasses.length} after filters`);
 
   renderTable(displayPasses);
 }

@@ -242,13 +242,6 @@
       <option value="100">100</option>
     </select>
   </span>
-  <span>
-    <label for="sel-show">Show:</label>
-    <select id="sel-show">
-      <option value="all">All passes</option>
-      <option value="planet" selected>Planet/Moon passes only</option>
-    </select>
-  </span>
 </div>
 
 <div id="generate-bar">
@@ -321,7 +314,6 @@ const STEP_MS       = 15 * 1000;  // 15-second scan steps
 function getCloseDeg()  { return parseFloat(document.getElementById('sel-threshold').value); }
 function getDaysAhead() { return Math.min(60, Math.max(1, parseInt(document.getElementById('inp-days').value) || 30)); }
 function getUnits()     { return document.getElementById('sel-units').value; }
-function getShowMode()  { return document.getElementById('sel-show').value; }
 function getMinAlt()    { return parseFloat(document.getElementById('sel-min-alt').value) || 0; }
 function getMaxDistKm() {
   const v = document.getElementById('sel-max-dist').value;
@@ -1307,14 +1299,10 @@ async function run(lat, lon, locationName) {
     });
   });
 
-  const displayPasses = getShowMode() === 'planet'
-    ? passes.filter(p => p.closeApproaches.length > 0)
-    : passes.filter(p => p.peak.elevation >= minAlt);
+  const displayPasses = passes.filter(p => p.closeApproaches.length > 0);
 
-  const filterNote = getShowMode() === 'planet' && displayPasses.length < planetCountRaw
-    ? ` (filtered to ${displayPasses.length} with planet/Moon passes)` : '';
   setStatus(`Found ${passes.length} visible pass${passes.length !== 1 ? 'es' : ''} · ` +
-            `${planetCountRaw} near a planet or Moon${filterNote}`);
+            `${planetCountRaw} near a planet or Moon · showing ${displayPasses.length} after filters`);
 
   renderTable(displayPasses);
 }
