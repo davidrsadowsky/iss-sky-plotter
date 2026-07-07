@@ -213,13 +213,33 @@
   </span>
   <span>
     <label for="inp-days">Days to search:</label>
-    <input type="number" id="inp-days" value="10" min="1" max="60" style="width:60px">
+    <input type="number" id="inp-days" value="30" min="1" max="60" style="width:60px">
+  </span>
+  <span>
+    <label for="sel-min-alt">Min. altitude:</label>
+    <select id="sel-min-alt">
+      <option value="0" selected>0°</option>
+      <option value="5">5°</option>
+      <option value="10">10°</option>
+      <option value="15">15°</option>
+      <option value="20">20°</option>
+    </select>
   </span>
   <span>
     <label for="sel-units">Distance units:</label>
     <select id="sel-units">
       <option value="mi" selected>Miles</option>
       <option value="km">Kilometers</option>
+    </select>
+  </span>
+  <span>
+    <label for="sel-max-dist">Max. distance:</label>
+    <select id="sel-max-dist">
+      <option value="none" selected>None</option>
+      <option value="10">10</option>
+      <option value="25">25</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
     </select>
   </span>
   <span>
@@ -299,9 +319,16 @@ const SUN_MAX_ALT   = -6;         // degrees — sun must be below this (civil t
 const STEP_MS       = 15 * 1000;  // 15-second scan steps
 
 function getCloseDeg()  { return parseFloat(document.getElementById('sel-threshold').value); }
-function getDaysAhead() { return Math.min(60, Math.max(1, parseInt(document.getElementById('inp-days').value) || 10)); }
+function getDaysAhead() { return Math.min(60, Math.max(1, parseInt(document.getElementById('inp-days').value) || 30)); }
 function getUnits()     { return document.getElementById('sel-units').value; }
 function getShowMode()  { return document.getElementById('sel-show').value; }
+function getMinAlt()    { return parseFloat(document.getElementById('sel-min-alt').value) || 0; }
+function getMaxDistKm() {
+  const v = document.getElementById('sel-max-dist').value;
+  if (v === 'none') return null;
+  const n = parseFloat(v);
+  return getUnits() === 'mi' ? n / 0.621371 : n;
+}
 // ────────────────────────────────────────────────────────────────────────
 
 let currentLat = null, currentLon = null;
@@ -1267,15 +1294,27 @@ async function run(lat, lon, locationName) {
   passes.forEach((p, i) => { p.idx = i; });
   currentPasses = passes;
 
-  const planetCount = passes.filter(p => p.closeApproaches.length > 0).length;
+  const planetCountRaw = passes.filter(p => p.closeApproaches.length > 0).length;
+
+  // Apply altitude and distance filters to close approaches
+  const minAlt = getMinAlt();
+  const maxDistKm = getMaxDistKm();
+  passes.forEach(pass => {
+    pass.closeApproaches = pass.closeApproaches.filter(ca => {
+      if (ca.transitElev < minAlt) return false;
+      if (maxDistKm !== null && ca.transitDistKm !== null && ca.transitDistKm > maxDistKm) return false;
+      return true;
+    });
+  });
+
   const displayPasses = getShowMode() === 'planet'
     ? passes.filter(p => p.closeApproaches.length > 0)
-    : passes;
+    : passes.filter(p => p.peak.elevation >= minAlt);
 
-  const filterNote = getShowMode() === 'planet' && displayPasses.length < passes.length
-    ? ` (filtered to ${displayPasses.length} with planet/Moon passes)`  : '';
+  const filterNote = getShowMode() === 'planet' && displayPasses.length < planetCountRaw
+    ? ` (filtered to ${displayPasses.length} with planet/Moon passes)` : '';
   setStatus(`Found ${passes.length} visible pass${passes.length !== 1 ? 'es' : ''} · ` +
-            `${planetCount} near a planet or Moon${filterNote}`);
+            `${planetCountRaw} near a planet or Moon${filterNote}`);
 
   renderTable(displayPasses);
 }
