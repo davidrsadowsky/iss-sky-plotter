@@ -301,7 +301,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26187.47606523  .00006115  00000+0  11937-3 0  9993","line2":"2 25544  51.6304 204.6205 0006688 262.9565  97.0662 15.48920216574748","epoch":"Mon, 06 Jul 2026 11:25:00 UTC","generated":"7/7/2026, 12:34:16 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26207.08830238  .00010158  00000+0  19105-3 0  9992","line2":"2 25544  51.6316 107.5836 0006934 338.3897  21.6798 15.49174705577787","epoch":"Sun, 26 Jul 2026 02:07:00 UTC","generated":"7/26/2026, 2:50:27 PM"}
 </script>
 
 <script>
@@ -797,6 +797,19 @@ async function fetchElevationsOpenTopo(locations) {
 
 // ── LIVE TLE FETCHING ─────────────────────────────────────────────────────
 
+async function fetchWithTimeout(url, options = {}, ms = 10000) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const resp = await fetch(url, { ...options, signal: ctrl.signal });
+    clearTimeout(id);
+    return resp;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
+}
+
 function parseTLEEpoch(line1) {
   const raw = line1.substring(18, 32).trim();
   const yr = parseInt(raw.substring(0, 2));
@@ -831,7 +844,7 @@ async function initTLE() {
 
   // 1. Try CelesTrak directly (most accurate, most widely used source)
   try {
-    const resp = await fetch('https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE', { cache: 'no-store' });
+    const resp = await fetchWithTimeout('https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE', { cache: 'no-store' });
     if (resp.ok) {
       const parsed = parseTLEText(await resp.text(), 'CelesTrak (live)');
       if (parsed) {
@@ -847,7 +860,7 @@ async function initTLE() {
 
   // 2. Try ARISS live feed (CORS-enabled, fallback)
   try {
-    const resp = await fetch('https://live.ariss.org/iss.txt', { cache: 'no-store' });
+    const resp = await fetchWithTimeout('https://live.ariss.org/iss.txt', { cache: 'no-store' });
     if (resp.ok) {
       const parsed = parseTLEText(await resp.text(), 'ARISS (live)');
       if (parsed) {
@@ -1368,7 +1381,6 @@ function onSettingChange() {
 document.getElementById('sel-threshold').addEventListener('change', onSettingChange);
 document.getElementById('inp-days').addEventListener('change', onSettingChange);
 document.getElementById('sel-units').addEventListener('change', onSettingChange);
-document.getElementById('sel-show').addEventListener('change', onSettingChange);
 
 // Auto-fetch TLE on every page load
 initTLE();
