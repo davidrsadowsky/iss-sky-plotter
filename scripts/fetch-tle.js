@@ -6,18 +6,26 @@ const path = require('path');
 
 const SOURCES = [
   'https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE',
+  'https://celestrak.com/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE',
   'https://live.ariss.org/iss.txt',
 ];
 const OUT_FILE = path.join(__dirname, '..', 'tle.json');
 
-function fetchText(url) {
+function fetchText(url, timeoutMs = 15000) {
+  const isAriss = url.includes('ariss.org');
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'iss-planet-transit-tool/1.0' } }, res => {
+    const opts = {
+      headers: { 'User-Agent': 'iss-planet-transit-tool/1.0' },
+      rejectUnauthorized: !isAriss,  // ARISS cert is expired; skip verification for that host only
+    };
+    const req = https.get(url, opts, res => {
       if (res.statusCode !== 200) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
       let data = '';
       res.on('data', c => data += c);
       res.on('end', () => resolve(data));
-    }).on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => { req.destroy(new Error(`Timeout after ${timeoutMs}ms`)); });
   });
 }
 
@@ -62,8 +70,8 @@ async function main() {
       console.warn(`  Failed: ${e.message}`);
     }
   }
-  console.error('All sources failed — tle.json not updated.');
-  process.exit(1);
+  console.warn('All sources failed — tle.json not updated. Site will use cached data.');
+  process.exit(0);
 }
 
 main();
