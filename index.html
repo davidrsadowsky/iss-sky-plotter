@@ -310,7 +310,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26261.78789299  .00005868  00000-0  11393-3 0  9993","line2":"2 25544  51.6308 196.8438 0004827 155.1807 204.9414 15.49168087586262","epoch":"Fri, 18 Sep 2026 18:54:00 UTC","generated":"9/19/2026, 12:48:40 AM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26261.78789299  .00005868  00000-0  11393-3 0  9993","line2":"2 25544  51.6308 196.8438 0004827 155.1807 204.9414 15.49168087586262","epoch":"Fri, 18 Sep 2026 18:54:00 UTC","generated":"9/19/2026, 1:14:21 AM"}
 </script>
 
 <script>
@@ -782,32 +782,35 @@ function renderCharts(passes) {
 }
 
 // ── ELEVATION API ────────────────────────────────────────────────────────
-// Primary: Google Elevation REST API via encoded polyline (512 points, no JS SDK loaded).
-// Fallback: Open-Topo-Data (100 locations, CORS-native, no key needed).
+// Primary: Google Maps JS API ElevationService (512 locations, high accuracy).
+// Fallback: Open-Topo-Data (100 locations, no key needed).
+// Maps API is lazy-loaded only when elevation is first requested.
 
-function encodePolyline(points) {
-  let output = '', prevLat = 0, prevLon = 0;
-  for (const pt of points) {
-    const lat = Math.round(pt.lat * 1e5);
-    const lon = Math.round(pt.lon * 1e5);
-    for (const delta of [lat - prevLat, lon - prevLon]) {
-      let v = delta < 0 ? ~(delta << 1) : delta << 1;
-      while (v >= 0x20) { output += String.fromCharCode((0x20 | (v & 0x1f)) + 63); v >>= 5; }
-      output += String.fromCharCode(v + 63);
-    }
-    prevLat = lat; prevLon = lon;
-  }
-  return output;
+let _mapsApiReady = false;
+let _mapsApiPromise = null;
+function loadMapsApi() {
+  if (_mapsApiReady) return Promise.resolve();
+  if (_mapsApiPromise) return _mapsApiPromise;
+  _mapsApiPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCzBfzymO3sYdpa2cUT5py0wZJ-R2pRip4&libraries=elevation&loading=async';
+    s.async = true;
+    s.onload = () => { _mapsApiReady = true; resolve(); };
+    s.onerror = () => reject(new Error('Google Maps API failed to load'));
+    document.head.appendChild(s);
+  });
+  return _mapsApiPromise;
 }
 
 async function fetchElevationsGoogle(locations) {
-  const encoded = encodePolyline(locations);
-  const url = `https://maps.googleapis.com/maps/api/elevation/json?locations=enc:${encodeURIComponent(encoded)}&key=AIzaSyCzBfzymO3sYdpa2cUT5py0wZJ-R2pRip4`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Google: HTTP ${resp.status}`);
-  const data = await resp.json();
-  if (data.status !== 'OK') throw new Error(`Google: ${data.status}`);
-  return data.results.map(r => r.elevation);
+  await loadMapsApi();
+  const elevator = new google.maps.ElevationService();
+  const latlngs = locations.map(l => ({ lat: l.lat, lng: l.lon }));
+  const result = await elevator.getElevationForLocations({ locations: latlngs });
+  if (result.results && result.results.length > 0) {
+    return result.results.map(r => r.elevation);
+  }
+  throw new Error('Google: no results');
 }
 
 async function fetchElevationsOpenTopo(locations) {
@@ -1394,7 +1397,7 @@ document.getElementById('btn-locate').addEventListener('click', () => {
       setStatus(msg);
       document.getElementById('manual-inputs').style.display = 'flex';
     },
-    { timeout: 15000, maximumAge: 300000 }
+    { timeout: 15000, maximumAge: 0 }
   );
 });
 
