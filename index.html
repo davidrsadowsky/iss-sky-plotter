@@ -215,8 +215,14 @@
     </select>
   </span>
   <span>
-    <label for="inp-days">Days to search:</label>
-    <input type="number" id="inp-days" value="30" min="1" max="60" style="width:60px">
+    <label for="sel-days">Days to search:</label>
+    <select id="sel-days">
+      <option value="7">7</option>
+      <option value="14">14</option>
+      <option value="21">21</option>
+      <option value="30" selected>30</option>
+      <option value="60">60</option>
+    </select>
   </span>
   <span>
     <label for="sel-min-alt">Min. altitude:</label>
@@ -304,7 +310,7 @@
 
 <!-- TLE data injected by generate.js -->
 <script id="tle-data" type="application/json">
-{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26261.78789299  .00005868  00000+0  11393-3 0  9992","line2":"2 25544  51.6308 196.8438 0004827 155.1807 204.9414 15.49168087586262","epoch":"Fri, 18 Sep 2026 18:54:00 UTC","generated":"9/18/2026, 11:31:02 PM"}
+{"name":"ISS (ZARYA)","line1":"1 25544U 98067A   26261.78789299  .00005868  00000+0  11393-3 0  9992","line2":"2 25544  51.6308 196.8438 0004827 155.1807 204.9414 15.49168087586262","epoch":"Fri, 18 Sep 2026 18:54:00 UTC","generated":"9/18/2026, 11:36:12 PM"}
 </script>
 
 <script>
@@ -315,7 +321,7 @@ const SUN_MAX_ALT   = -6;         // degrees — sun must be below this (civil t
 const STEP_MS       = 15 * 1000;  // 15-second scan steps
 
 function getCloseDeg()  { return parseFloat(document.getElementById('sel-threshold').value); }
-function getDaysAhead() { return Math.min(60, Math.max(1, parseInt(document.getElementById('inp-days').value) || 30)); }
+function getDaysAhead() { return parseInt(document.getElementById('sel-days').value); }
 function getUnits()     { return document.getElementById('sel-units').value; }
 function getMinAlt()    { return parseFloat(document.getElementById('sel-min-alt').value) || 0; }
 function getMaxDistKm() {
@@ -1405,7 +1411,7 @@ function onSettingChange() {
   // Settings changes don't auto-run — user clicks Generate Passes
 }
 document.getElementById('sel-threshold').addEventListener('change', onSettingChange);
-document.getElementById('inp-days').addEventListener('change', onSettingChange);
+document.getElementById('sel-days').addEventListener('change', onSettingChange);
 document.getElementById('sel-units').addEventListener('change', onSettingChange);
 
 // Auto-fetch TLE on every page load
