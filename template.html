@@ -1377,34 +1377,49 @@ document.getElementById('btn-locate').addEventListener('click', () => {
     setStatus('Geolocation not supported by this browser. Please enter coordinates manually.');
     return;
   }
-  setStatus('Requesting location… (may take up to 15 seconds on desktop)');
+  setStatus('Requesting location…');
   document.getElementById('btn-locate').disabled = true;
 
-  let attempts = 0;
-  function tryGeo() {
-    attempts++;
-    navigator.geolocation.getCurrentPosition(
-      pos => {
+  async function ipFallback() {
+    setStatus('Locating via IP address…');
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 5000);
+      const r = await fetch('https://ipinfo.io/json', { signal: ctrl.signal });
+      clearTimeout(t);
+      const d = await r.json();
+      if (d.loc) {
+        const [lat, lon] = d.loc.split(',').map(Number);
+        currentLat = lat; currentLon = lon;
         document.getElementById('btn-locate').disabled = false;
-        currentLat = pos.coords.latitude; currentLon = pos.coords.longitude;
         document.getElementById('btn-generate').disabled = false;
-        setStatus('Location detected — click Generate Passes to search.');
-      },
-      err => {
-        if (err.code === 3 && attempts < 2) { tryGeo(); return; }
-        document.getElementById('btn-locate').disabled = false;
-        const msg = err.code === 1
-          ? 'Location permission denied — please allow location access in your browser settings, then try again. Or enter coordinates manually.'
-          : err.code === 3
-          ? 'Location request timed out — your device may not have a fix. Try again or enter coordinates manually.'
-          : 'Location unavailable. Enter coordinates manually.';
-        setStatus(msg);
-        document.getElementById('manual-inputs').style.display = 'flex';
-      },
-      { timeout: 15000, maximumAge: 0 }
-    );
+        setStatus('Using approximate IP location — for precision, enter coordinates manually.');
+        return;
+      }
+    } catch(e) {}
+    document.getElementById('btn-locate').disabled = false;
+    setStatus('Location unavailable. Enter coordinates manually.');
+    document.getElementById('manual-inputs').style.display = 'flex';
   }
-  tryGeo();
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      document.getElementById('btn-locate').disabled = false;
+      currentLat = pos.coords.latitude; currentLon = pos.coords.longitude;
+      document.getElementById('btn-generate').disabled = false;
+      setStatus('Location detected — click Generate Passes to search.');
+    },
+    err => {
+      if (err.code === 1) {
+        document.getElementById('btn-locate').disabled = false;
+        setStatus('Location permission denied — please allow location access in your browser settings, then try again. Or enter coordinates manually.');
+        document.getElementById('manual-inputs').style.display = 'flex';
+      } else {
+        ipFallback();
+      }
+    },
+    { timeout: 3000, maximumAge: 0 }
+  );
 });
 
 // ── Enter key support for manual inputs ──────────────────────────────────
