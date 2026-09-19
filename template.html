@@ -1362,7 +1362,12 @@ document.getElementById('btn-locate').addEventListener('click', () => {
     },
     err => {
       document.getElementById('btn-locate').disabled = false;
-      setStatus('Location denied or unavailable. Enter coordinates manually.');
+      const msg = err.code === 1
+        ? 'Location permission denied — please allow location access in your browser settings, then try again. Or enter coordinates manually.'
+        : err.code === 3
+        ? 'Location request timed out — your device may not have a fix. Try again or enter coordinates manually.'
+        : 'Location unavailable. Enter coordinates manually.';
+      setStatus(msg);
       document.getElementById('manual-inputs').style.display = 'flex';
     },
     { timeout: 10000 }
