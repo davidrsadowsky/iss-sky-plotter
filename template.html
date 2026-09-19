@@ -793,8 +793,7 @@ function loadMapsApi() {
   if (_mapsApiPromise) return _mapsApiPromise;
   _mapsApiPromise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCzBfzymO3sYdpa2cUT5py0wZJ-R2pRip4&libraries=elevation&loading=async';
-    s.async = true;
+    s.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCzBfzymO3sYdpa2cUT5py0wZJ-R2pRip4&libraries=elevation';
     s.onload = () => { _mapsApiReady = true; resolve(); };
     s.onerror = () => reject(new Error('Google Maps API failed to load'));
     document.head.appendChild(s);
@@ -1380,25 +1379,32 @@ document.getElementById('btn-locate').addEventListener('click', () => {
   }
   setStatus('Requesting location… (may take up to 15 seconds on desktop)');
   document.getElementById('btn-locate').disabled = true;
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      document.getElementById('btn-locate').disabled = false;
-      currentLat = pos.coords.latitude; currentLon = pos.coords.longitude;
-      document.getElementById('btn-generate').disabled = false;
-      setStatus('Location detected — click Generate Passes to search.');
-    },
-    err => {
-      document.getElementById('btn-locate').disabled = false;
-      const msg = err.code === 1
-        ? 'Location permission denied — please allow location access in your browser settings, then try again. Or enter coordinates manually.'
-        : err.code === 3
-        ? 'Location request timed out — your device may not have a fix. Try again or enter coordinates manually.'
-        : 'Location unavailable. Enter coordinates manually.';
-      setStatus(msg);
-      document.getElementById('manual-inputs').style.display = 'flex';
-    },
-    { timeout: 15000, maximumAge: 0 }
-  );
+
+  let attempts = 0;
+  function tryGeo() {
+    attempts++;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        document.getElementById('btn-locate').disabled = false;
+        currentLat = pos.coords.latitude; currentLon = pos.coords.longitude;
+        document.getElementById('btn-generate').disabled = false;
+        setStatus('Location detected — click Generate Passes to search.');
+      },
+      err => {
+        if (err.code === 3 && attempts < 2) { tryGeo(); return; }
+        document.getElementById('btn-locate').disabled = false;
+        const msg = err.code === 1
+          ? 'Location permission denied — please allow location access in your browser settings, then try again. Or enter coordinates manually.'
+          : err.code === 3
+          ? 'Location request timed out — your device may not have a fix. Try again or enter coordinates manually.'
+          : 'Location unavailable. Enter coordinates manually.';
+        setStatus(msg);
+        document.getElementById('manual-inputs').style.display = 'flex';
+      },
+      { timeout: 15000, maximumAge: 0 }
+    );
+  }
+  tryGeo();
 });
 
 // ── Enter key support for manual inputs ──────────────────────────────────
