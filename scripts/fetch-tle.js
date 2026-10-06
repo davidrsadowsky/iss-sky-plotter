@@ -18,14 +18,24 @@ function fetchText(url, timeoutMs = 15000) {
       headers: { 'User-Agent': 'iss-planet-transit-tool/1.0' },
       rejectUnauthorized: !isAriss,  // ARISS cert is expired; skip verification for that host only
     };
+    let settled = false;
+    const done = (fn, val) => { if (!settled) { settled = true; fn(val); } };
     const req = https.get(url, opts, res => {
-      if (res.statusCode !== 200) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
+      if (res.statusCode !== 200) {
+        res.resume();  // drain to prevent socket hang
+        done(reject, new Error(`HTTP ${res.statusCode}`));
+        return;
+      }
       let data = '';
       res.on('data', c => data += c);
-      res.on('end', () => resolve(data));
+      res.on('end', () => done(resolve, data));
+      res.on('error', err => done(reject, err));
     });
-    req.on('error', reject);
-    req.setTimeout(timeoutMs, () => { req.destroy(new Error(`Timeout after ${timeoutMs}ms`)); });
+    req.on('error', err => done(reject, err));
+    req.setTimeout(timeoutMs, () => {
+      done(reject, new Error(`Timeout after ${timeoutMs}ms`));
+      req.destroy();  // no error arg — avoids a second 'error' event
+    });
   });
 }
 
@@ -74,4 +84,7 @@ async function main() {
   process.exit(0);
 }
 
-main();
+main().catch(err => {
+  console.error('Unexpected error:', err.message);
+  process.exit(0);  // don't spam email on unexpected failures
+});
